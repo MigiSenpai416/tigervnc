@@ -112,10 +112,22 @@ Without `--wayland` or `mode=wayland`, nothing changes.
   * Move and resize through client-side decorations (xdg
     `move`/`resize` requests and `_NET_WM_MOVERESIZE`).
   * X11 title bars (`X11TitleBars`, default on): managed X11 windows
-    get a 22 pixel server-side bar. Dragging it moves the window, and it
-    has maximize/restore and close (`WM_DELETE_WINDOW`) buttons. It is
-    blue when focused and grey otherwise. There is no title text, since
-    the compositor has no font renderer. Windows that ask for no title
+    get a 22 pixel server-side bar.
+    * *Title.* The bar shows the window's title (`_NET_WM_NAME`/`WM_NAME`)
+      in white. It is drawn with a built-in copy of the public domain
+      X.Org misc-fixed 6x13 font (`deco_font.h`, Latin-1; other
+      characters show as `?`), so there is no font library dependency.
+      The text follows renames and is cut with `...` before the buttons.
+    * *Buttons and dragging.* Dragging the bar (also on the text) moves
+      the window. It has maximize/restore and close (`WM_DELETE_WINDOW`)
+      buttons. It is blue when focused and grey otherwise.
+    * *Resize borders.* An invisible 5 pixel border around the frame
+      (title bar plus window) resizes with the pointer, by one edge or,
+      within 16 pixels of a corner, by two. The pointer shows the
+      matching resize cursor. Resizing keeps the window's
+      `WM_NORMAL_HINTS` minimum size and room for the buttons. There are
+      no borders while the window is maximized.
+    * *Windows without a bar.* Windows that ask for no title
     through `_MOTIF_WM_HINTS`, override-redirect windows and fullscreen
     windows get no bar. A window whose bar would be off the top edge is
     moved down to make room.
@@ -195,9 +207,35 @@ Without `--wayland` or `mode=wayland`, nothing changes.
   this socket instead. `-list`, `-get` (never the password), `-desc`,
   `-set`/`name=value` (only for `AllowOverride` parameters, and
   `desktop` renames the server), `-connect [-view-only] host[:port]`
-  and `-disconnect` work as with Xvnc. Without options, for example
-  `vncconfig -nowin` in an xstartup file, it exits at once, because the
-  server already handles the clipboard.
+  and `-disconnect` work as with Xvnc.
+  * *Without options* (`vncconfig`, `vncconfig -nowin`, `-iconic`), it
+    runs as on Xvnc. It is an X client of Xwayland (`DISPLAY`), using
+    the same TX toolkit window and the same Accept/Reject dialog
+    (`QueryConnectDialog`). The control socket stands in for the VNC
+    extension:
+    * The window's clipboard checkboxes (`AcceptCutText`, `SetPrimary`,
+      `SendCutText`, `SendPrimary`) read and set the parameters with
+      `get`/`set`.
+    * A persistent `watch` connection replaces
+      `XVncExtSelectInput(VncExtQueryConnectMask)`. The server sends
+      `query<TAB>id<TAB>timeout<TAB>address<TAB>user`, and the dialog
+      answers `approve id 1|0`.
+  * *QueryConnect.* `WaylandServerDesktop::queryConnection()` follows
+    `XserverDesktop::queryConnection()`, with the same messages and the
+    same `QueryConnectTimeout` parameter (default 10 s):
+    * A connection is prompted while a vncconfig is running. "Accept"
+      admits it. "Reject" rejects it with "Connection rejected by local
+      user".
+    * With no answer, it is rejected when the timeout expires.
+    * A second connection during a query is rejected ("Another
+      connection is currently being queried.").
+    * With no vncconfig running, connections are rejected ("Unable to
+      query the local user to accept the connection.").
+    * Reverse connections (`vncconfig -connect`) are not queried, as
+      on Xvnc.
+  * *Bool values.* vncconfig now treats "on"/"true"/"yes" as well as
+    "1" as true when it reads bool parameters, for both servers. Xvnc
+    and the control socket return "on"/"off".
 * **Xwayland** is started when the compositor starts. Disable it with
   `-Xwayland=0`. Its display number is chosen automatically by wlroots,
   and is not necessarily the VNC display number.
@@ -262,7 +300,9 @@ Without `--wayland` or `mode=wayland`, nothing changes.
 | `unix/xvnc-wayland/protocol/wlr-data-control-unstable-v1.xml` | protocol XML (from wlroots 0.19.2) for the nested clipboard bridge's client code |
 | `unix/xvnc-wayland/nested_bridge.{h,c}` | nested compositor detection helper and clipboard bridge |
 | `unix/xvnc-wayland/ControlSocket.{h,cxx}` | vncconfig control socket |
-| `unix/vncconfig/vncconfig.{cxx,man}` | fallback to the control socket in Wayland mode |
+| `unix/vncconfig/vncconfig.{cxx,man}` | control socket in Wayland mode: command-line options, the window and the QueryConnect prompt |
+| `unix/xvnc-wayland/deco_font.h` | 6x13 bitmap font for X11 title text (generated from X.Org misc-fixed, public domain) |
+| `contrib/wayland-mode/tools/gen-deco-font.py` | generator for `deco_font.h` |
 | `CMakeLists.txt`, `unix/CMakeLists.txt` | `ENABLE_WAYLAND_SERVER` (AUTO/ON/OFF), `WLROOTS_PKG` |
 | `config.h.in` | `CMAKE_INSTALL_FULL_SYSCONFDIR` for vncsession |
 | `unix/vncserver/vncserver.in` | `mode=` handling, Wayland session start |
@@ -429,13 +469,22 @@ Run with `contrib/wayland-mode/run-tests.sh`. Results are in
     the next one. Normal hosts have a much larger `/dev/shm`.
 * Depths other than 24 cost a conversion of each damaged area. Depth 8
   is true colour (rgb332), with no colour map.
-* vncconfig:
-  * No `QueryConnect` dialog, so `QueryConnect` still rejects
-    connections, as Xvnc does when no vncconfig is running.
-  * No clipboard window, because the server syncs the clipboard itself.
-* X11 title bars have no text, no resize borders and no minimize
-  button. Resizing X11 windows still needs the application
-  (`_NET_WM_MOVERESIZE`) or a maximize.
+* vncconfig's window and dialog need Xwayland. With `-Xwayland=0`
+  there is no X display, and plain `vncconfig` fails ("Unable to open
+  display"), as it would without an X server. The command-line options
+  still work.
+* vncconfig's Accept dialog shows the buttons, but not the Host/User/
+  countdown labels. This also happens with X11 Xvnc in the test image,
+  with the unmodified upstream TX code, so it is not specific to Wayland
+  mode.
+* X11 title bars have no minimize button (there is no taskbar to
+  restore from). The title font covers Latin-1 only.
+* Clients that don't support the cursor pseudo-encoding see the
+  server-rendered cursor at the top-left corner. `Xvnc-wayland` does
+  not report pointer motion to the RFB core's cursor position
+  (`setCursorPos`). The test client is such a client, so a cursor
+  sprite can appear at (0,0) in screenshots. Normal viewers draw the
+  cursor locally.
 * `wlr-output-management` changes the size only. The refresh rate is
   accepted and ignored.
 * Software rendering only (pixman). There is no GPU/dmabuf, and clients

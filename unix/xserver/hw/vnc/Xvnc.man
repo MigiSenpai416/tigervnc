@@ -381,11 +381,12 @@ The compositor uses a simple stacking window manager. New windows open
 centred on the screen with the pointer, a click focuses and raises a window,
 and windows can be moved and resized with the usual client-side
 decorations. Maximize and fullscreen fill one screen of the viewer's layout.
-X11 windows get a simple title bar for moving, maximizing and closing them.
+X11 windows get a simple title bar showing their title, for moving,
+maximizing and closing them, and a border for resizing them.
 \fBwlr\-randr\fP and similar tools can change the size of the output.
 \fBvncconfig\fP works through a control socket,
-\fI$XDG_RUNTIME_DIR/tigervnc\-\fP\fIsocket\fP\fB.vncconfig\fP, but there is no
-\fBQueryConnect\fP dialog. Run \fBXvnc \-\-wayland \-help\fP for the full
+\fI$XDG_RUNTIME_DIR/tigervnc\-\fP\fIsocket\fP\fB.vncconfig\fP, including its
+window and the \fBQueryConnect\fP dialog (as an X client of Xwayland). Run \fBXvnc \-\-wayland \-help\fP for the full
 list of options.
 
 The session can also be a complete Wayland compositor of its own, such as
@@ -416,7 +417,8 @@ MIT-MAGIC-COOKIE-1 key, \fI$XDG_RUNTIME_DIR/tigervnc\-\fP\fIsocket\fP\fB.Xauthor
 and set \fBXAUTHORITY\fP for the session. Default is on.
 .TP
 .B \-X11TitleBars
-Draw title bars on X11 windows. Default is on.
+Draw title bars (title text, move, maximize and close) and resize borders
+on X11 windows. Default is on.
 
 .SH USAGE WITH INETD
 By configuring the \fBinetd\fP(1) service appropriately, Xvnc can be launched

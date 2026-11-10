@@ -561,6 +561,8 @@ static void view_get_box(struct view* v, struct wlr_box* box)
 }
 
 /* Moves and resizes a view so that its window geometry is "box" */
+static void deco_update(struct view* v);
+
 static void view_set_box(struct view* v, const struct wlr_box* box)
 {
   if (v->owner.type == OWNER_XDG) {
@@ -575,11 +577,11 @@ static void view_set_box(struct view* v, const struct wlr_box* box)
       wlr_scene_node_set_position(&v->scene_tree->node, box->x, box->y);
     wlr_xwayland_surface_configure(v->xsurface, box->x, box->y,
                                    box->width, box->height);
+    /* The title bar and the resize borders follow the new size */
+    deco_update(v);
   }
 #endif
 }
-
-static void deco_update(struct view* v);
 
 static void view_set_activated(struct view* v, bool activated)
 {

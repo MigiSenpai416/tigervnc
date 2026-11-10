@@ -99,8 +99,9 @@ core::EnumParameter
 
 core::BoolParameter
   x11TitleBars("X11TitleBars",
-               _("Draw title bars (move, maximize and close) on X11 "
-                 "windows; Wayland applications draw their own"),
+               _("Draw title bars (title, move, maximize and close) and "
+                 "resize borders on X11 windows; Wayland applications "
+                 "draw their own"),
                true);
 core::BoolParameter
   xwaylandAuth("XwaylandAuth",

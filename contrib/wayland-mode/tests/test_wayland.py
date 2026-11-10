@@ -852,6 +852,45 @@ def xwin_geometry(env, wid):
     return tuple(int(g) for g in m.groups()) if m else None
 
 
+def misc_fixed_glyphs():
+    """6x13 glyph bitmaps (rows of 6 bits) from the X.Org misc-fixed font
+    file, independent of the server's built-in copy."""
+    import gzip
+    from PIL import PcfFontFile
+    f = PcfFontFile.PcfFontFile(gzip.open(
+        "/usr/share/fonts/X11/misc/6x13-ISO8859-1.pcf.gz"))
+    glyphs = {}
+    for code in range(32, 256):
+        g = f.glyph[code] if code < len(f.glyph) else None
+        rows = [[False] * 6 for _ in range(13)]
+        if g:
+            _, (x0, y0, _, _), _, im = g
+            for yy in range(im.size[1]):
+                for xx in range(im.size[0]):
+                    X, Y = x0 + xx, 11 + y0 + yy
+                    if im.getpixel((xx, yy)) and 0 <= X < 6 and 0 <= Y < 13:
+                        rows[Y][X] = True
+        glyphs[code] = rows
+    return glyphs
+
+
+def title_text_matches(c, g, T, text, glyphs):
+    """Compares the title bar's white text pixels with `text` rendered in
+    6x13 at (6, (T-13)//2) in the bar; returns (match, mismatches)."""
+    x0, y0 = g[0] + 6, g[1] - T + (T - 13) // 2
+    bad = 0
+    width = 6 * (len(text) + 2)          # also check nothing follows
+    for y in range(13):
+        for x in range(width):
+            i = x // 6
+            want = i < len(text) and glyphs[ord(text[i])][y][x % 6]
+            px = c.pixel(x0 + x, y0 + y)
+            white = px is not None and min(px) >= 240
+            if want != white:
+                bad += 1
+    return bad == 0, bad
+
+
 def t_x11_title_bars():
     import subprocess
     T = 22                            # title bar height
@@ -860,12 +899,21 @@ def t_x11_title_bars():
     p = start_small(11, ["-geometry", "800x600"], sess)
     shots, notes = [], []
     ok = True
+
+    def check(cond, note):
+        nonlocal ok
+        ok = ok and bool(cond)
+        notes.append(("" if cond else "FAILED: ") + note)
+
     try:
+        glyphs = misc_fixed_glyphs()
         wait_tcp(5911, timeout=20)
         env = small_app_env(envf)
         c = RFBClient(port=5911, security="VncAuth", password=PASSWORD)
-        xt = subprocess.Popen(["xterm", "-bg", "white", "-geometry",
-                               "30x8+100+100"], env=env)
+        # sh: bash's prompt would set its own title
+        xt = subprocess.Popen(["xterm", "-bg", "white", "-T", "Title Test 42",
+                               "-geometry", "30x8+100+100", "-e", "sh"],
+                              env=env)
         rc, wid = sh(["xdotool", "search", "--sync", "--class", "XTerm"],
                      env=env, timeout=15)
         wid = wid.split()[0] if wid.split() else "0"
@@ -873,12 +921,57 @@ def t_x11_title_bars():
         c.refresh()
         g = xwin_geometry(env, wid)
         shots.append(c.screenshot(s.artifact("wayland-17-x11-title-bar.png")))
-        bar = c.pixel(g[0] + 10, g[1] - T // 2) if g else None
-        has_bar = g is not None and near(bar, BAR, 3)
-        notes.append("xterm at %r, title bar pixel %r" % (g, bar))
-        ok = ok and has_bar
+        # between the title text and the buttons
+        bar = c.pixel(g[0] + g[2] - 2 * T - 4, g[1] - T // 2) if g else None
+        check(g is not None and near(bar, BAR, 3),
+              "xterm at %r, title bar pixel %r" % (g, bar))
 
-        # drag the title bar by (+200, +150)
+        # title text: the window's title, pixel exact in misc-fixed 6x13
+        m, bad = title_text_matches(c, g, T, "Title Test 42", glyphs)
+        check(m, "title text 'Title Test 42' drawn (%d pixels differ)" % bad)
+        sh(["xdotool", "set_window", "--name", "Renamed-xterm", wid],
+           env=env)
+        time.sleep(1)
+        c.refresh()
+        m, bad = title_text_matches(c, g, T, "Renamed-xterm", glyphs)
+        shots.append(c.screenshot(s.artifact(
+            "wayland-20-x11-title-renamed.png")))
+        check(m, "after renaming, title text 'Renamed-xterm' drawn "
+              "(%d pixels differ)" % bad)
+
+        # resize with the pointer on the (invisible) borders
+        def resize(x0, y0, dx, dy, name, want):
+            c.drag(x0, y0, x0 + dx, y0 + dy)
+            time.sleep(1)
+            got = xwin_geometry(env, wid)
+            check(got == want, "%s drag by %+d,%+d -> %r (want %r)" %
+                  (name, dx, dy, got, want))
+            return got
+        x, y, w, h = g
+        g1 = resize(x + w + 2, y + h // 2, 100, 0, "right edge",
+                    (x, y, w + 100, h))
+        x, y, w, h = g1 or g
+        g1 = resize(x + w + 2, y + h + 2, 50, 40, "bottom-right corner",
+                    (x, y, w + 50, h + 40))
+        x, y, w, h = g1 or g
+        g1 = resize(x - 3, y + h // 2, -60, 0, "left edge",
+                    (x - 60, y, w + 60, h))
+        x, y, w, h = g1 or g
+        g1 = resize(x + w // 2, y - T - 3, 0, -30, "top edge (above the bar)",
+                    (x, y - 30, w, h + 30))
+        x, y, w, h = g1 or g
+        g1 = resize(x - 3, y - T - 3, 20, 20, "top-left corner",
+                    (x + 20, y + 20, w - 20, h - 20))
+        c.refresh()
+        shots.append(c.screenshot(s.artifact(
+            "wayland-21-x11-title-bar-resized.png")))
+        g = g1 or g
+        # the title follows the new width (still drawn, bar wider)
+        m, bad = title_text_matches(c, g, T, "Renamed-xterm", glyphs)
+        check(m, "title text still correct after resizing (%d pixels "
+              "differ)" % bad)
+
+        # drag the title bar by (+200, +150), grabbing it on the text
         bx, by = g[0] + 20, g[1] - T // 2
         c.drag(bx, by, bx + 200, by + 150)
         time.sleep(1)
@@ -886,9 +979,9 @@ def t_x11_title_bars():
         c.refresh()
         shots.append(c.screenshot(s.artifact(
             "wayland-18-x11-title-bar-moved.png")))
-        moved = g2 is not None and (g2[0], g2[1]) == (g[0] + 200, g[1] + 150)
-        notes.append("after dragging the bar by +200,+150: %r" % (g2,))
-        ok = ok and moved
+        moved = g2 is not None and g2 == (g[0] + 200, g[1] + 150, g[2], g[3])
+        check(moved, "after dragging the bar (on the title text) by "
+              "+200,+150: %r" % (g2,))
 
         # maximize button (second from the right)
         w = g2[2]
@@ -933,8 +1026,9 @@ def t_x11_title_bars():
     return ok, "; ".join(notes), shots
 
 
-s.run("X11 title bars: drawn on X11 windows, drag moves, maximize/"
-      "restore and close buttons work", t_x11_title_bars)
+s.run("X11 title bars: window title drawn as text (pixel exact, follows "
+      "renames), resize by edges and corners, drag moves, maximize/restore "
+      "and close buttons work", t_x11_title_bars)
 def t_vncconfig():
     import subprocess, stat
     envf, sess = small_session(12)
@@ -1034,9 +1128,17 @@ def t_vncconfig():
               "-connect 127.0.0.1:%d rc=%d, listening viewer got %r" %
               (lport, rc, banner))
 
-        rc, out = vc("-nowin")
-        check(rc == 0, "vncconfig -nowin (as in xstartup files) rc=%d %r" %
-              (rc, out))
+        # "vncconfig -nowin &" (as in xstartup files) keeps running, like
+        # on Xvnc, as the QueryConnect prompt (see t_query_connect)
+        vp = subprocess.Popen(["vncconfig", "-nowin"], env=env,
+                              stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL)
+        time.sleep(2)
+        running = vp.poll() is None
+        vp.terminate()
+        vp.wait(5)
+        check(running, "vncconfig -nowin keeps running in the background "
+              "(running after 2 s: %s)" % running)
     except Exception as e:
         ok = False
         notes.append("error: %r" % e)
@@ -1049,4 +1151,191 @@ def t_vncconfig():
 s.run("vncconfig works in Wayland mode (control socket): -list -get "
       "-desc -set/AllowOverride, desktop rename, -disconnect, -connect",
       t_vncconfig)
+
+
+def t_query_connect():
+    """QueryConnect with vncconfig's prompt, as on Xvnc: vncconfig runs as
+    an X client of Xwayland; connections are prompted while it runs and
+    rejected when it doesn't. The observing viewer is a reverse connection
+    (vncconfig -connect), which Xvnc lets bypass the query."""
+    import subprocess, threading
+    T = 22
+    envf, sess = small_session(13)
+    p = start_small(13, ["-geometry", "800x600", "-desktop", "qc-test",
+                         "-QueryConnect", "-QueryConnectTimeout", "4",
+                         "-AcceptCutText=0"], sess)
+    shots, notes = [], []
+    ok = True
+    vcp = None
+
+    def check(cond, note):
+        nonlocal ok
+        ok = ok and bool(cond)
+        notes.append(("" if cond else "FAILED: ") + note)
+
+    def connect():
+        try:
+            v = RFBClient(port=5913, security="VncAuth", password=PASSWORD,
+                          timeout=20)
+            name = v.name
+            v.close()
+            return "connected:" + name
+        except Exception as e:
+            return "error:" + str(e)
+
+    def connect_bg():
+        res = {}
+        t = threading.Thread(target=lambda: res.update(r=connect()))
+        t.start()
+        return t, res
+
+    def window(name, timeout=10):
+        rc, out = sh(["xdotool", "search", "--sync", "--onlyvisible",
+                      "--name", name], env=env, timeout=timeout)
+        ids = out.split()
+        return xwin_geometry(env, ids[-1]) if ids else None
+
+    def dark(x, y, w, h):
+        return sum(1 for yy in range(y, y + h) for xx in range(x, x + w)
+                   if max(c.pixel(xx, yy)) < 90)
+
+    try:
+        wait_tcp(5913, timeout=20)
+        env = small_app_env(envf)
+
+        r = connect()
+        check(r == "error:authentication failed: Unable to query the local "
+              "user to accept the connection.",
+              "no prompt running: viewer -> %r" % r)
+
+        lsock = socket.socket()
+        lsock.bind(("127.0.0.1", 0))
+        lsock.listen(1)
+        sh(["vncconfig", "-connect", "127.0.0.1:%d" %
+            lsock.getsockname()[1]], env=env)
+        lsock.settimeout(10)
+        conn, _ = lsock.accept()
+        lsock.close()
+        c = RFBClient(sock=conn, security="VncAuth", password=PASSWORD)
+        c.refresh()
+        notes.append("observer: reverse connection (no query, as on Xvnc)")
+
+        vcp = subprocess.Popen(["vncconfig"], env=env,
+                               stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL)
+        g = window("VNC config")
+        time.sleep(1.5)
+        c.refresh()
+        shots.append(c.screenshot(s.artifact("wayland-22-vncconfig-window.png")))
+        check(g is not None, "vncconfig window on screen at %r" % (g,))
+        # The four checkboxes (12, 29, 46, 63 px down): AcceptCutText=0 at
+        # start, the rest on; a ticked box has dark pixels inside
+        rows = {"AcceptCutText": 12, "SetPrimary": 29, "SendCutText": 46,
+                "SendPrimary": 63}
+        xoff = {"AcceptCutText": 12, "SetPrimary": 22, "SendCutText": 12,
+                "SendPrimary": 22}
+        ticks = {k: dark(g[0] + xoff[k], g[1] + v - 3, 6, 6)
+                 for k, v in rows.items()}
+        check(ticks["AcceptCutText"] == 0 and ticks["SendCutText"] > 4 and
+              ticks["SendPrimary"] > 4,
+              "checkboxes show the server's settings (dark pixels in boxes "
+              "%r)" % ticks)
+        # clicking a checkbox changes the server parameter
+        c.click(g[0] + 40, g[1] + rows["SendCutText"])
+        time.sleep(1)
+        rc, v1 = sh(["vncconfig", "-get", "SendCutText"], env=env)
+        c.click(g[0] + 40, g[1] + rows["AcceptCutText"])
+        time.sleep(1)
+        rc, v2 = sh(["vncconfig", "-get", "AcceptCutText"], env=env)
+        c.refresh()
+        shots.append(c.screenshot(s.artifact(
+            "wayland-23-vncconfig-toggled.png")))
+        check(v1.strip() == "off" and v2.strip() == "on",
+              "clicking 'Send clipboard' -> SendCutText=%s, 'Accept "
+              "clipboard' -> AcceptCutText=%s" % (v1.strip(), v2.strip()))
+        c.click(g[0] + 40, g[1] + rows["SendCutText"])
+        time.sleep(1)
+        rc, v3 = sh(["vncconfig", "-get", "SendCutText"], env=env)
+        check(v3.strip() == "on", "clicking it again -> SendCutText=%s" %
+              v3.strip())
+
+        def answer(button, shot=None):
+            d = window("Accept connection")
+            if d is None:
+                return None
+            time.sleep(1)
+            c.refresh()
+            if shot:
+                shots.append(c.screenshot(s.artifact(shot)))
+            if button == "Accept":
+                c.click(d[0] + 34, d[1] + d[3] - 14)
+            else:
+                c.click(d[0] + d[2] - 34, d[1] + d[3] - 14)
+            return d
+
+        t, res = connect_bg()
+        d = answer("Accept", "wayland-24-queryconnect-dialog.png")
+        t.join(25)
+        check(d is not None and res.get("r") == "connected:qc-test",
+              "prompt shown at %r, Accept clicked -> viewer %r" %
+              (d, res.get("r")))
+
+        t, res = connect_bg()
+        d = answer("Reject")
+        t.join(25)
+        check(d is not None and res.get("r") ==
+              "error:authentication failed: Connection rejected by local "
+              "user", "Reject clicked -> viewer %r" % res.get("r"))
+
+        t, res = connect_bg()
+        window("Accept connection")
+        r2 = connect()
+        check(r2 == "error:authentication failed: Another connection is "
+              "currently being queried.",
+              "second viewer while a query is open -> %r" % r2)
+        t.join(25)
+        check(res.get("r") == "error:authentication failed: The attempt "
+              "to prompt the user to accept the connection failed",
+              "no answer within QueryConnectTimeout=4 -> viewer %r" %
+              res.get("r"))
+
+        vcp.terminate()
+        vcp.wait(5)
+        vcp = None
+        time.sleep(1)
+        r = connect()
+        check(r == "error:authentication failed: Unable to query the local "
+              "user to accept the connection.",
+              "after vncconfig exits: viewer -> %r" % r)
+
+        # -nowin: no window, but still the prompt
+        vcp = subprocess.Popen(["vncconfig", "-nowin"], env=env,
+                               stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL)
+        time.sleep(2)
+        rc, out = sh(["xdotool", "search", "--onlyvisible", "--name",
+                      "VNC config"], env=env)
+        t, res = connect_bg()
+        d = answer("Accept", "wayland-25-queryconnect-nowin.png")
+        t.join(25)
+        check(out.strip() == "" and d is not None and
+              res.get("r") == "connected:qc-test",
+              "vncconfig -nowin: no window (%r), prompt shown, Accept -> %r"
+              % (out.strip(), res.get("r")))
+        c.close()
+    except Exception as e:
+        ok = False
+        notes.append("error: %r" % e)
+    finally:
+        if vcp:
+            vcp.kill()
+        os.killpg(p.pid, 15)
+        p.wait(10)
+    return ok, "; ".join(notes), shots
+
+
+s.run("QueryConnect with the vncconfig prompt (as on Xvnc): rejected "
+      "without vncconfig, Accept/Reject/busy/timeout with it, -nowin; "
+      "vncconfig window shows and sets the clipboard parameters",
+      t_query_connect)
 sys.exit(s.finish())

@@ -117,9 +117,11 @@ session, or \fI$XDG_RUNTIME_DIR/tigervnc\-$WAYLAND_DISPLAY.vncconfig\fP.
 Only the user running the server can use it. \fB\-connect\fP,
 \fB\-disconnect\fP, \fB\-list\fP, \fB\-get\fP, \fB\-desc\fP and
 \fB\-set\fP work as with Xvnc (\fB\-set\fP is limited to
-\fBAllowOverride\fP). Without options \fBvncconfig\fP exits at once: the
-server handles the clipboard itself, and query connect dialogs are not
-supported in Wayland mode.
+\fBAllowOverride\fP). Without options \fBvncconfig\fP runs as with Xvnc,
+as an X client of Xwayland: the window sets the clipboard parameters,
+and with \fBQueryConnect\fP set it shows the Accept/Reject dialog for
+each incoming connection (also with \fB\-nowin\fP). While no
+\fBvncconfig\fP is running, such connections are rejected.
 .
 .SH SEE ALSO
 .BR vncpasswd (1),
