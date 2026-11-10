@@ -12,3 +12,7 @@ add_subdirectory(x0vncserver)
 if (ENABLE_WAYLAND)
   add_subdirectory(w0vncserver)
 endif()
+
+if (ENABLE_WAYLAND_SERVER)
+  add_subdirectory(xvnc-wayland)
+endif()
