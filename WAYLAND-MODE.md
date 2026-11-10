@@ -269,6 +269,7 @@ Without `--wayland` or `mode=wayland`, nothing changes.
 | `unix/vncserver/vncsession.c` | read `mode` before PAM, set `XDG_SESSION_TYPE` |
 | `unix/vncserver/vncsession.man.in`, `vncserver-config-defaults` | docs |
 | `contrib/wayland-mode/` | Dockerfiles, build script, test runner, tests |
+| `contrib/wayland-mode/patches/wlroots-16cb509a-allocator-finish.patch` | upstream wlroots fix applied to the test image's libwlroots 0.19.2 (nested compositors, see Limitations) |
 | `test-artifacts/` | screenshots, logs, results of the last test run |
 
 ## Pinned dependencies
@@ -382,14 +383,44 @@ Run with `contrib/wayland-mode/run-tests.sh`. Results are in
     something on its output changes. Until then the old picture is shown
     at the old size. The test interacts with foot in labwc after each
     resize, as a user would.
-  * sway with two outputs (`WLR_WL_OUTPUTS=2`) sometimes (about one run
-    in four here) shows our background on its first output after a
-    layout change. The cause is on sway's side: on that output it
-    commits only its 10x16 cursor image as the window's buffer. This is
-    the wlroots wayland backend's hardware cursor path. With
-    `WLR_NO_HARDWARE_CURSORS=1` in sway's environment, 8 of 8 runs were
-    correct. The test leaves this variable unset and stays strict, so
-    this case can fail.
+  * **Nested wlroots compositors need wlroots >= 0.19.3, or 0.19.2 with
+    upstream commit 16cb509a** ("render/allocator: add missing
+    wlr_buffer_finish() in destroy impls"). This matters most for sway with two
+    outputs. Ubuntu 26.04 ships libwlroots 0.19.2-1, which lacks it.
+    Without the fix, a nested sway with `WLR_WL_OUTPUTS=2` showed our
+    background on its first output after a layout change in about one run in
+    four.
+    * *Mechanism.* Under Xvnc --wayland the nested compositor renders with
+      pixman, so it uses wlroots' shm allocator. In 0.19.2 that allocator
+      frees buffers without emitting `wlr_buffer.events.destroy`. The
+      wayland backend caches one `wl_buffer` per `wlr_buffer` *pointer* and
+      drops a cache entry only on that destroy signal. So when a resize
+      replaces sway's swapchains, stale entries survive.
+    * *What goes wrong.* When malloc gives a freed buffer's address to a
+      new 800x600 output buffer, `get_or_create_wl_buffer()` returns the
+      old `wl_buffer`. In the failing runs that was a 10x16 cursor image.
+      sway then commits that as the output window's frame, and we
+      correctly show a 10x16 buffer on a 800x600 window with our
+      background around it.
+    * *How it was proven.* A wlroots built with logging in the buffer
+      cache showed the same `wl_buffer` reused for one pointer whose size
+      had changed (created 10x16, reused as 800x600) with no destroy in
+      between. The `WAYLAND_DEBUG` trace shows the 10x16 `wl_buffer`
+      attached to the output surface.
+    * *What it is not.* The hardware cursor is only involved because the
+      cursor swapchain adds buffer churn. `WLR_NO_HARDWARE_CURSORS=1` just
+      made the reuse rarer. No `wl_pointer.set_cursor` reaches our seat
+      during the test, and our compositor handles the commits correctly.
+      A compositor can't tell this stale buffer from a legitimate one, so
+      there is no fix on our side.
+    * *Test image.* Dockerfile.test rebuilds the distro's libwlroots
+      0.19.2-1 with only that upstream patch
+      (`contrib/wayland-mode/patches/`). The test still runs sway with
+      hardware cursors and checks both outputs strictly. With the patch,
+      20 of 20 consecutive standalone `test_nested.py` runs passed
+      (hardware cursors on). The same image with the stock library failed
+      the two-screen test on its first run. Users of nested sway/labwc on
+      0.19.2 need the same fix from their distribution.
   * Only text MIME types reach the viewer, as for any client. Other
     types are passed between the nested seat and our seat.
   * Under Docker's default 64 MiB `/dev/shm`, several servers with nested

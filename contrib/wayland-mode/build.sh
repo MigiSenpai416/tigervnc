@@ -21,6 +21,11 @@ XORG_SOURCE_ARCHIVE=${XORG_SOURCE_ARCHIVE:-/usr/src/xorg-server.tar.xz}
 mkdir -p "$BUILD"
 cd "$BUILD"
 
+# wlroots patches for the test image (Dockerfile.test builds with $BUILD as
+# context)
+rm -rf "$BUILD/wlroots-patches"
+cp -R "$SRC/contrib/wayland-mode/patches" "$BUILD/wlroots-patches"
+
 echo "=== [1/3] CMake build"
 cmake -G "Unix Makefiles" "$SRC" \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
