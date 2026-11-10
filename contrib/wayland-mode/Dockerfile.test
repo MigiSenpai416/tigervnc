@@ -1,0 +1,20 @@
+# Test image: build environment + extra test tools + the staged install
+# produced by build.sh. Build with the build directory as context:
+#   docker build -f contrib/wayland-mode/Dockerfile.test -t tigervnc-wl-test /path/to/build
+ARG BUILDENV_IMAGE=tigervnc-wl-buildenv:26.04
+FROM ${BUILDENV_IMAGE} AS tools
+ARG http_proxy
+ARG https_proxy
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      xclip x11-utils wlr-randr wayland-utils openssl python3-pil \
+      libpam-pwquality && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -f /etc/apt/apt.conf.d/80proxy
+
+FROM tools
+COPY stage/ /
+RUN ldconfig && \
+    useradd -m -s /bin/bash vncuser && \
+    echo 'vncuser:vncpass123' | chpasswd && \
+    echo ':1=vncuser' >> /etc/tigervnc/vncserver.users

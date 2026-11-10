@@ -1,0 +1,19 @@
+# Test image with systemd as PID 1, logind and pam_systemd, to test the
+# vncserver@.service unit and the PAM session type. Run privileged:
+#   docker run -d --privileged --cgroupns=host \
+#     -v /sys/fs/cgroup:/sys/fs/cgroup:rw tigervnc-wl-systemd
+ARG TEST_IMAGE=tigervnc-wl-test
+FROM ${TEST_IMAGE}
+ARG http_proxy
+ARG https_proxy
+RUN if [ -n "$http_proxy" ]; then \
+      printf 'Acquire::http::Proxy "%s";\nAcquire::https::Proxy "%s";\n' "$http_proxy" "${https_proxy:-$http_proxy}" > /etc/apt/apt.conf.d/80proxy; \
+    fi && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends systemd systemd-sysv \
+      libpam-systemd dbus-user-session && \
+    rm -rf /var/lib/apt/lists/* /etc/apt/apt.conf.d/80proxy && \
+    systemctl mask getty@tty1.service systemd-udevd.service \
+      systemd-networkd.service systemd-resolved.service || true
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]
