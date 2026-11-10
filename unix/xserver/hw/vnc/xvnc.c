@@ -58,6 +58,8 @@ from the X Consortium.
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <string.h>
+#include <unistd.h>
 #include <sys/param.h>
 #include "dix.h"
 #include "os.h"
@@ -234,6 +236,9 @@ ddxUseMsg(void)
     ErrorF("-verbose [n]           verbose startup messages\n");
     ErrorF("-quiet                 minimal startup messages\n");
     ErrorF("-version               show the server version\n");
+    ErrorF("--x11                  run as an X11 server (the default)\n");
+    ErrorF("--wayland              run as a Wayland compositor instead; see\n"
+           "                       'Xvnc --wayland --help'\n");
     ErrorF("\nVNC parameters:\n");
 
     fprintf(stderr, "\n"
@@ -1249,8 +1254,57 @@ vncClientGone(int fd)
     }
 }
 
+/*
+ * Mode selection. "Xvnc" and "Xvnc --x11" run this X server exactly as
+ * before. "Xvnc --wayland" replaces this process with the Wayland mode
+ * server, which takes the same VNC options. The X server never sees
+ * either flag.
+ */
+static void
+vncSelectMode(int *argc, char *argv[])
+{
+    int i, j;
+    int wayland = 0, x11 = 0;
+
+    for (i = 1; i < *argc; i++) {
+        if (strcmp(argv[i], "--wayland") == 0)
+            wayland = 1;
+        else if (strcmp(argv[i], "--x11") == 0)
+            x11 = 1;
+    }
+
+    if (!wayland && !x11)
+        return;
+
+    if (wayland && x11) {
+        fprintf(stderr, "%s: --x11 and --wayland cannot be combined\n",
+                argv[0]);
+        exit(1);
+    }
+
+    for (i = 1, j = 1; i < *argc; i++) {
+        if (strcmp(argv[i], "--wayland") == 0 ||
+            strcmp(argv[i], "--x11") == 0)
+            continue;
+        argv[j++] = argv[i];
+    }
+    argv[j] = NULL;
+    *argc = j;
+
+    if (wayland) {
+        const char *path = vncGetWaylandServerPath();
+
+        execv(path, argv);
+        fprintf(stderr, "%s: Unable to start the Wayland mode server "
+                "%s: %s\n", argv[0], path, strerror(errno));
+        exit(1);
+    }
+}
+
 int
 main(int argc, char *argv[], char *envp[])
 {
+    vncSelectMode(&argc, argv);
+
     return dix_main(argc, argv, envp);
 }

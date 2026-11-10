@@ -23,6 +23,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <core/Configuration.h>
 #include <core/Logger_stdio.h>
@@ -45,6 +46,23 @@ void vncInitRFB(void)
   core::initStdIOLoggers();
   core::initSyslogLogger();
   core::LogWriter::setLogParams("*:stderr:30");
+}
+
+// Location of the Wayland mode server ("Xvnc --wayland"). It is a
+// separate program so that wlroots never gets linked into the X server.
+const char* vncGetWaylandServerPath(void)
+{
+  const char* path = getenv("TIGERVNC_XVNC_WAYLAND");
+
+  // Allow running from a build tree, but never for set-id processes
+  if (path && *path && getuid() == geteuid() && getgid() == getegid())
+    return path;
+
+#ifdef CMAKE_INSTALL_FULL_LIBEXECDIR
+  return CMAKE_INSTALL_FULL_LIBEXECDIR "/Xvnc-wayland";
+#else
+  return "/usr/libexec/Xvnc-wayland";
+#endif
 }
 
 void vncLogError(const char *name, const char *format, ...)

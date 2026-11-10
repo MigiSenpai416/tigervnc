@@ -3,8 +3,15 @@
 Xvnc \- the X VNC server 
 .SH SYNOPSIS
 .B Xvnc
+.RB [ \-\-x11 ]
 .RI [ options ] 
 .RI : display#
+.br
+.B Xvnc \-\-wayland
+.RI [ options ]
+.RI [: display# ]
+.RB [ \-\- 
+.IR "session command" ]
 .SH DESCRIPTION
 .B Xvnc
 is the X VNC (Virtual Network Computing) server.  It is based on a standard X
@@ -343,6 +350,33 @@ When \fBNoClipboard\fP parameter is set, allowing override of \fBSendCutText\fP
 and \fBAcceptCutText\fP has no effect.
 
 Default is \fBdesktop,AcceptPointerEvents,SendCutText,AcceptCutText,SendPrimary,SetPrimary\fP.
+
+.SH WAYLAND MODE
+Started as \fBXvnc \-\-wayland\fP, Xvnc runs a Wayland compositor instead
+of an X server (\fBXvnc \-\-x11\fP, or no flag, runs the X server as
+always). The compositor is a separate program, \fBXvnc-wayland\fP, installed
+in the libexec directory and started by Xvnc. It is based on wlroots and has a
+headless, "virtual" output in place of the X screen.
+
+The display number selects the VNC port (5900+\fIdisplay#\fP) and the name
+of the Wayland socket (\fBwayland\-\fP\fIdisplay#\fP, see the
+\fBWaylandDisplay\fP parameter). Unless \fB\-Xwayland=0\fP is given,
+Xwayland is started for X11 applications; its display number is chosen
+automatically.
+
+Everything after \fB\-\-\fP is run as the session once the compositor and
+Xwayland are ready, with \fBWAYLAND_DISPLAY\fP, \fBDISPLAY\fP and
+\fBXDG_SESSION_TYPE=wayland\fP set. The server exits when the session
+command exits.
+
+The VNC parameters described above, including the security and
+authentication parameters, work the same way in Wayland mode, as do
+\fB\-geometry\fP, \fB\-depth 24\fP and \fB\-inetd\fP. X server options
+are not accepted. The compositor uses a simple stacking window manager:
+new windows are centred, a click focuses and raises a window, and windows can
+be moved and resized with the usual client-side decorations.
+\fBvncconfig\fP and \fBQueryConnect\fP are not available in Wayland mode.
+Run \fBXvnc \-\-wayland \-help\fP for the full list of options.
 
 .SH USAGE WITH INETD
 By configuring the \fBinetd\fP(1) service appropriately, Xvnc can be launched
