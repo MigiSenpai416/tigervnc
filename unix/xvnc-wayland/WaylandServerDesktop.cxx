@@ -20,10 +20,12 @@
 #include <config.h>
 #endif
 
+#include <limits.h>
 #include <signal.h>
 #include <string.h>
 #include <unistd.h>
 
+#include <list>
 #include <vector>
 
 #include <core/LogWriter.h>
@@ -36,10 +38,21 @@
 #include <rfb/VNCServer.h>
 #include <rfb/SConnection.h>
 
+#include <network/Socket.h>
+
+#include "ControlSocket.h"
 #include "WaylandServerDesktop.h"
 #include "parameters.h"
 
 static core::LogWriter vlog("WaylandDesktop");
+
+// As in Xvnc (XserverDesktop.cc)
+core::IntParameter
+  queryConnectTimeout("QueryConnectTimeout",
+                      _("Number of seconds to show the 'Accept "
+                        "connection' dialog before rejecting the "
+                        "connection"),
+                      10, 0, INT_MAX);
 
 // XRGB8888, little endian words: 0x00RRGGBB
 static const rfb::PixelFormat fbFormat(32, 24, false, true,
@@ -51,7 +64,10 @@ WaylandServerDesktop::WaylandServerDesktop(int width, int height,
                                            int nestedMode,
                                            const rfb::PixelFormat& pf)
   : comp(nullptr), server(nullptr), pb(nullptr), nativePF(pf),
-    convert(!(pf == fbFormat)), xReady(false)
+    convert(!(pf == fbFormat)), xReady(false),
+    control(nullptr), pendingQuery(nullptr), pendingQueryId(0),
+    lastQueryId(0),
+    queryConnectTimer(this, &WaylandServerDesktop::queryTimeout)
 {
   struct wvnc_options opts;
   struct wvnc_callbacks cb;
@@ -140,12 +156,77 @@ void WaylandServerDesktop::setScreens(const rfb::ScreenSet& layout)
   wvnc_set_screens(comp, boxes.data(), boxes.size());
 }
 
+// Same logic and messages as XserverDesktop::queryConnection(), with
+// the control socket's "watch" connections (vncconfig) in place of the
+// VNC extension's QueryConnect event clients
 void WaylandServerDesktop::queryConnection(rfb::SConnection* conn)
 {
-  // FIXME: Xvnc asks vncconfig; there is no equivalent helper yet
-  server->approveConnection(conn, false,
-                            _("Unable to query the local user to "
-                              "accept the connection."));
+  if (queryConnectTimer.isStarted()) {
+    server->approveConnection(conn, false,
+                              _("Another connection is currently being "
+                                "queried."));
+    return;
+  }
+
+  const char* user = conn->getUserName();
+  if (!user || user[0] == '\0')
+    user = _("(anonymous)");
+  uint32_t id = ++lastQueryId;
+  if (id == 0)
+    id = ++lastQueryId;
+
+  int count = 0;
+  if (control)
+    count = control->notifyQueryConnect(id, queryConnectTimeout,
+                                        conn->getSock()->getPeerAddress(),
+                                        user);
+  if (count == 0) {
+    server->approveConnection(conn, false,
+                              _("Unable to query the local user to "
+                                "accept the connection."));
+    return;
+  }
+
+  pendingQuery = conn;
+  pendingQueryId = id;
+  queryConnectTimer.start(queryConnectTimeout * 1000);
+}
+
+void WaylandServerDesktop::approveConnection(uint32_t id, bool accept,
+                                             const char* rejectMsg)
+{
+  if (!pendingQuery || id != pendingQueryId)
+    return;
+
+  // Check that the connection is still there
+  std::list<network::Socket*> sockets;
+  bool valid = false;
+  server->getSockets(&sockets);
+  for (network::Socket* sock : sockets)
+    if (server->getConnection(sock) == pendingQuery)
+      valid = true;
+
+  if (valid)
+    server->approveConnection(pendingQuery, accept, rejectMsg);
+  pendingQuery = nullptr;
+  pendingQueryId = 0;
+  queryConnectTimer.stop();
+}
+
+void WaylandServerDesktop::queryTimeout(core::Timer*)
+{
+  rfb::SConnection* conn = pendingQuery;
+  pendingQuery = nullptr;
+  pendingQueryId = 0;
+  if (!conn)
+    return;
+  std::list<network::Socket*> sockets;
+  server->getSockets(&sockets);
+  for (network::Socket* sock : sockets)
+    if (server->getConnection(sock) == conn)
+      server->approveConnection(conn, false,
+                                _("The attempt to prompt the user to "
+                                  "accept the connection failed"));
 }
 
 void WaylandServerDesktop::terminate()

@@ -55,6 +55,7 @@
 
 #include <wlr/backend.h>
 #include <wlr/backend/headless.h>
+#include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/interfaces/wlr_keyboard.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/pixman.h>
@@ -245,7 +246,8 @@ struct wvnc_compositor {
   struct wl_listener cursor_surface_commit;
   struct wl_listener cursor_surface_destroy;
   int cursor_hotx, cursor_hoty;
-  bool cursor_is_default;
+  bool cursor_is_default;     /* a cursor of ours (cursor_named) is shown */
+  const char* cursor_named;
 
   /* Clipboard */
   struct wl_list pending_writes;
@@ -310,11 +312,16 @@ struct view {
   struct wlr_scene_tree* deco;
   struct wlr_scene_rect* deco_bar;
   struct wlr_scene_rect* deco_buttons[2];   /* maximize, close */
+  struct wlr_scene_rect* deco_edges[4];     /* resize: top, bottom, l, r */
+  struct wlr_scene_buffer* deco_title;
+  char* deco_title_text;                    /* what deco_title shows */
+  int deco_title_width;
   struct deco_part {
     struct owner owner;
     struct view* view;
     int kind;
-  } deco_parts[3];
+  } deco_parts[4];
+  struct wl_listener set_title;
   struct wl_listener associate;
   struct wl_listener dissociate;
   struct wl_listener request_configure;
@@ -797,7 +804,11 @@ static void view_place(struct view* v)
 /* X11 title bars ----------------------------------------------------- */
 
 #define DECO_HEIGHT 22
-enum { DECO_BAR, DECO_MAXIMIZE, DECO_CLOSE };
+#define DECO_BORDER 5     /* invisible resize border around the frame */
+#define DECO_CORNER 16    /* corner zone along each edge */
+enum { DECO_BAR, DECO_MAXIMIZE, DECO_CLOSE, DECO_EDGE };
+
+#include "deco_font.h"
 
 static bool view_has_deco(struct view* v)
 {
@@ -818,6 +829,128 @@ static bool view_has_deco(struct view* v)
 #endif
 }
 
+#ifdef HAVE_XWAYLAND
+/* A wlr_buffer over malloc'ed ARGB8888 pixels, for the title text */
+struct text_buffer {
+  struct wlr_buffer base;
+  uint32_t* data;
+  size_t stride;
+};
+
+static void text_buffer_destroy(struct wlr_buffer* wb)
+{
+  struct text_buffer* tb = wl_container_of(wb, tb, base);
+  wlr_buffer_finish(wb);
+  free(tb->data);
+  free(tb);
+}
+
+static bool text_buffer_begin(struct wlr_buffer* wb, uint32_t flags,
+                              void** data, uint32_t* format, size_t* stride)
+{
+  struct text_buffer* tb = wl_container_of(wb, tb, base);
+  if (flags & WLR_BUFFER_DATA_PTR_ACCESS_WRITE)
+    return false;
+  *data = tb->data;
+  *format = DRM_FORMAT_ARGB8888;
+  *stride = tb->stride;
+  return true;
+}
+
+static void text_buffer_end(struct wlr_buffer* wb)
+{
+  (void)wb;
+}
+
+static const struct wlr_buffer_impl text_buffer_impl = {
+  .destroy = text_buffer_destroy,
+  .begin_data_ptr_access = text_buffer_begin,
+  .end_data_ptr_access = text_buffer_end,
+};
+
+/* Next code point of UTF-8 text; invalid bytes come out as '?' */
+static uint32_t utf8_next(const unsigned char** p)
+{
+  const unsigned char* s = *p;
+  uint32_t cp;
+  int n;
+  if (s[0] < 0x80) { *p = s + 1; return s[0]; }
+  if ((s[0] & 0xe0) == 0xc0) { cp = s[0] & 0x1f; n = 1; }
+  else if ((s[0] & 0xf0) == 0xe0) { cp = s[0] & 0x0f; n = 2; }
+  else if ((s[0] & 0xf8) == 0xf0) { cp = s[0] & 0x07; n = 3; }
+  else { *p = s + 1; return '?'; }
+  for (int i = 1; i <= n; i++) {
+    if ((s[i] & 0xc0) != 0x80) { *p = s + i; return '?'; }
+    cp = (cp << 6) | (s[i] & 0x3f);
+  }
+  *p = s + n + 1;
+  return cp;
+}
+
+/* Title text in white, cut with "..." to max_w pixels; NULL if empty */
+static struct wlr_buffer* render_title(const char* title, int max_w)
+{
+  uint32_t cps[512];
+  size_t n = 0, fit;
+  const unsigned char* p = (const unsigned char*)title;
+
+  while (p && *p && n < sizeof(cps) / sizeof(*cps)) {
+    uint32_t cp = utf8_next(&p);
+    if (cp < 0x20 || (cp >= 0x7f && cp < 0xa0))
+      cp = ' ';
+    cps[n++] = cp > 0xff ? '?' : cp;   /* the font covers Latin-1 */
+  }
+  fit = max_w / DECO_FONT_W;
+  if (n == 0 || fit == 0)
+    return NULL;
+  if (n > fit) {
+    n = fit;
+    for (size_t i = n >= 3 ? n - 3 : 0; i < n; i++)
+      cps[i] = '.';
+  }
+
+  struct text_buffer* tb = calloc(1, sizeof(*tb));
+  int w = (int)n * DECO_FONT_W, h = DECO_FONT_H;
+  if (!tb)
+    return NULL;
+  tb->stride = (size_t)w * 4;
+  tb->data = calloc((size_t)w * h, 4);
+  if (!tb->data) {
+    free(tb);
+    return NULL;
+  }
+  for (size_t i = 0; i < n; i++)
+    for (int y = 0; y < h; y++) {
+      unsigned char bits = deco_font[cps[i]][y];
+      for (int x = 0; x < DECO_FONT_W; x++)
+        if (bits & (0x80 >> x))
+          tb->data[(size_t)y * w + i * DECO_FONT_W + x] = 0xffffffff;
+    }
+  wlr_buffer_init(&tb->base, &text_buffer_impl, w, h);
+  return &tb->base;
+}
+
+static void deco_set_title(struct view* v, int w)
+{
+  const char* title = v->xsurface->title ? v->xsurface->title : "";
+  /* left of the buttons, with some padding */
+  int max_w = w - 2 * DECO_HEIGHT - 12;
+
+  if (v->deco_title_text && strcmp(v->deco_title_text, title) == 0 &&
+      v->deco_title_width == max_w)
+    return;
+  free(v->deco_title_text);
+  v->deco_title_text = strdup(title);
+  v->deco_title_width = max_w;
+
+  struct wlr_buffer* buf = render_title(title, max_w);
+  wlr_scene_buffer_set_buffer(v->deco_title, buf);
+  wlr_scene_node_set_enabled(&v->deco_title->node, buf != NULL);
+  if (buf)
+    wlr_buffer_drop(buf);   /* the scene buffer keeps a lock */
+}
+#endif
+
 static void deco_update(struct view* v)
 {
 #ifdef HAVE_XWAYLAND
@@ -825,8 +958,9 @@ static void deco_update(struct view* v)
   static const float bar_inactive[4] = { 0.45f, 0.47f, 0.50f, 1.0f };
   static const float button_max[4] = { 0.85f, 0.85f, 0.85f, 1.0f };
   static const float button_close[4] = { 0.80f, 0.25f, 0.25f, 1.0f };
+  static const float invisible[4] = { 0, 0, 0, 0 };
   bool show = v->scene_tree && view_has_deco(v);
-  int w;
+  int w, h;
 
   if (!show) {
     if (v->deco)
@@ -843,7 +977,10 @@ static void deco_update(struct view* v)
     v->deco_buttons[1] = wlr_scene_rect_create(v->deco, DECO_HEIGHT - 8,
                                                DECO_HEIGHT - 8,
                                                button_close);
-    for (int i = 0; i < 3; i++) {
+    v->deco_title = wlr_scene_buffer_create(v->deco, NULL);
+    for (int i = 0; i < 4; i++)
+      v->deco_edges[i] = wlr_scene_rect_create(v->deco, 1, 1, invisible);
+    for (int i = 0; i < 4; i++) {
       v->deco_parts[i].owner.type = OWNER_DECO;
       v->deco_parts[i].view = v;
       v->deco_parts[i].kind = i;
@@ -851,10 +988,15 @@ static void deco_update(struct view* v)
     v->deco_bar->node.data = &v->deco_parts[DECO_BAR];
     v->deco_buttons[0]->node.data = &v->deco_parts[DECO_MAXIMIZE];
     v->deco_buttons[1]->node.data = &v->deco_parts[DECO_CLOSE];
+    /* the title text belongs to the bar (drag, double click) */
+    v->deco_title->node.data = &v->deco_parts[DECO_BAR];
+    for (int i = 0; i < 4; i++)
+      v->deco_edges[i]->node.data = &v->deco_parts[DECO_EDGE];
   }
 
   w = v->xsurface->width > 3 * DECO_HEIGHT ? v->xsurface->width :
                                              3 * DECO_HEIGHT;
+  h = DECO_HEIGHT + v->xsurface->height;   /* frame height */
   wlr_scene_node_set_enabled(&v->deco->node, true);
   wlr_scene_node_set_position(&v->deco->node, 0, -DECO_HEIGHT);
   wlr_scene_rect_set_size(v->deco_bar, w, DECO_HEIGHT);
@@ -864,9 +1006,68 @@ static void deco_update(struct view* v)
                               w - DECO_HEIGHT + 4, 4);
   wlr_scene_node_set_position(&v->deco_buttons[0]->node,
                               w - 2 * DECO_HEIGHT + 4, 4);
+  wlr_scene_node_set_position(&v->deco_title->node, 6,
+                              (DECO_HEIGHT - DECO_FONT_H) / 2);
+  deco_set_title(v, w);
+
+  /* Resize borders, no resizing when maximized (like moving) */
+  bool resizable = !v->maximized;
+  for (int i = 0; i < 4; i++)
+    wlr_scene_node_set_enabled(&v->deco_edges[i]->node, resizable);
+  wlr_scene_rect_set_size(v->deco_edges[0], w + 2 * DECO_BORDER, DECO_BORDER);
+  wlr_scene_node_set_position(&v->deco_edges[0]->node, -DECO_BORDER,
+                              -DECO_BORDER);
+  wlr_scene_rect_set_size(v->deco_edges[1], w + 2 * DECO_BORDER, DECO_BORDER);
+  wlr_scene_node_set_position(&v->deco_edges[1]->node, -DECO_BORDER, h);
+  wlr_scene_rect_set_size(v->deco_edges[2], DECO_BORDER, h);
+  wlr_scene_node_set_position(&v->deco_edges[2]->node, -DECO_BORDER, 0);
+  wlr_scene_rect_set_size(v->deco_edges[3], DECO_BORDER, h);
+  wlr_scene_node_set_position(&v->deco_edges[3]->node, w, 0);
 #else
   (void)v;
 #endif
+}
+
+#ifdef HAVE_XWAYLAND
+/* Which edges a press at (px, py) on a resize border grabs */
+static uint32_t deco_edges_at(struct view* v, int px, int py)
+{
+  struct wlr_xwayland_surface* xs = v->xsurface;
+  int left = xs->x, right = xs->x + xs->width;
+  int top = xs->y - DECO_HEIGHT, bottom = xs->y + xs->height;
+  uint32_t edges = 0;
+
+  /* The borders lie outside the frame */
+  if (py < top || py >= bottom) {
+    edges = py < top ? WLR_EDGE_TOP : WLR_EDGE_BOTTOM;
+    if (px < left + DECO_CORNER)
+      edges |= WLR_EDGE_LEFT;
+    else if (px >= right - DECO_CORNER)
+      edges |= WLR_EDGE_RIGHT;
+  } else {
+    edges = px < left ? WLR_EDGE_LEFT : WLR_EDGE_RIGHT;
+    if (py < top + DECO_CORNER)
+      edges |= WLR_EDGE_TOP;
+    else if (py >= bottom - DECO_CORNER)
+      edges |= WLR_EDGE_BOTTOM;
+  }
+  return edges;
+}
+#endif
+
+static const char* edge_cursor(uint32_t edges)
+{
+  switch (edges) {
+  case WLR_EDGE_TOP: return "top_side";
+  case WLR_EDGE_BOTTOM: return "bottom_side";
+  case WLR_EDGE_LEFT: return "left_side";
+  case WLR_EDGE_RIGHT: return "right_side";
+  case WLR_EDGE_TOP | WLR_EDGE_LEFT: return "top_left_corner";
+  case WLR_EDGE_TOP | WLR_EDGE_RIGHT: return "top_right_corner";
+  case WLR_EDGE_BOTTOM | WLR_EDGE_LEFT: return "bottom_left_corner";
+  case WLR_EDGE_BOTTOM | WLR_EDGE_RIGHT: return "bottom_right_corner";
+  }
+  return "default";
 }
 
 static void view_maximize(struct view* v, bool maximize, bool fullscreen)
@@ -1695,11 +1896,20 @@ static void xw_destroy(struct wl_listener* listener, void* data)
   wl_list_remove(&v->request_resize.link);
   wl_list_remove(&v->request_maximize.link);
   wl_list_remove(&v->request_fullscreen.link);
+  wl_list_remove(&v->set_title.link);
   wl_list_remove(&v->destroy.link);
   wl_list_remove(&v->map.link);
   wl_list_remove(&v->unmap.link);
   wl_list_remove(&v->link);
+  free(v->deco_title_text);
   free(v);
+}
+
+static void xw_set_title(struct wl_listener* listener, void* data)
+{
+  struct view* v = wl_container_of(listener, v, set_title);
+  (void)data;
+  deco_update(v);
 }
 
 static void handle_xwayland_new_surface(struct wl_listener* listener,
@@ -1739,6 +1949,8 @@ static void handle_xwayland_new_surface(struct wl_listener* listener,
   wl_signal_add(&xs->events.request_maximize, &v->request_maximize);
   v->request_fullscreen.notify = xw_request_fullscreen;
   wl_signal_add(&xs->events.request_fullscreen, &v->request_fullscreen);
+  v->set_title.notify = xw_set_title;
+  wl_signal_add(&xs->events.set_title, &v->set_title);
 }
 
 static void handle_xwayland_ready(struct wl_listener* listener, void* data)
@@ -1814,24 +2026,34 @@ static void send_cursor_argb(struct wvnc_compositor* c, int w, int h,
   free(rgba);
 }
 
-static void set_default_cursor(struct wvnc_compositor* c)
+/* One of our own cursors (default arrow, resize arrows) */
+static void set_named_cursor(struct wvnc_compositor* c, const char* name)
 {
   struct wlr_xcursor* xc;
 
-  if (c->cursor_is_default)
+  if (c->cursor_is_default && c->cursor_named &&
+      strcmp(c->cursor_named, name) == 0)
     return;
 
-  xc = wlr_xcursor_manager_get_xcursor(c->xcursor_mgr, "default", 1);
+  xc = wlr_xcursor_manager_get_xcursor(c->xcursor_mgr, name, 1);
+  if (!xc)
+    xc = wlr_xcursor_manager_get_xcursor(c->xcursor_mgr, "default", 1);
   if (!xc)
     xc = wlr_xcursor_manager_get_xcursor(c->xcursor_mgr, "left_ptr", 1);
   if (!xc)
     return;
+  c->cursor_named = name;
 
   struct wlr_xcursor_image* img = xc->images[0];
   send_cursor_argb(c, img->width, img->height, img->hotspot_x,
                    img->hotspot_y, (const uint32_t*)img->buffer,
                    img->width);
   c->cursor_is_default = true;
+}
+
+static void set_default_cursor(struct wvnc_compositor* c)
+{
+  set_named_cursor(c, "default");
 }
 
 static void clear_cursor_surface(struct wvnc_compositor* c)
@@ -2019,19 +2241,32 @@ static void process_grab_motion(struct wvnc_compositor* c)
 
   int left = box.x, right = box.x + box.width;
   int top = box.y, bottom = box.y + box.height;
+  int minw = 1, minh = 1;
+#ifdef HAVE_XWAYLAND
+  if (v->owner.type == OWNER_XWAYLAND) {
+    /* Room for the title bar buttons, and the window's own minimum */
+    xcb_size_hints_t* hints = v->xsurface->size_hints;
+    if (view_has_deco(v))
+      minw = 3 * DECO_HEIGHT;
+    if (hints && (hints->flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE)) {
+      if (hints->min_width > minw) minw = hints->min_width;
+      if (hints->min_height > minh) minh = hints->min_height;
+    }
+  }
+#endif
   if (c->grab_edges & WLR_EDGE_TOP) {
     top += dy;
-    if (top >= bottom - 1) top = bottom - 1;
+    if (top > bottom - minh) top = bottom - minh;
   } else if (c->grab_edges & WLR_EDGE_BOTTOM) {
     bottom += dy;
-    if (bottom <= top + 1) bottom = top + 1;
+    if (bottom < top + minh) bottom = top + minh;
   }
   if (c->grab_edges & WLR_EDGE_LEFT) {
     left += dx;
-    if (left >= right - 1) left = right - 1;
+    if (left > right - minw) left = right - minw;
   } else if (c->grab_edges & WLR_EDGE_RIGHT) {
     right += dx;
-    if (right <= left + 1) right = left + 1;
+    if (right < left + minw) right = left + minw;
   }
   box.x = left;
   box.y = top;
@@ -2069,7 +2304,18 @@ static void pointer_motion(struct wvnc_compositor* c, uint32_t time)
   } else {
     clear_cursor_surface(c);
     wlr_seat_pointer_clear_focus(c->seat);
-    set_default_cursor(c);
+    const char* name = "default";
+#ifdef HAVE_XWAYLAND
+    struct wlr_scene_node* node =
+      wlr_scene_node_at(&c->scene->tree.node, c->px, c->py, &sx, &sy);
+    if (node && node->type == WLR_SCENE_NODE_RECT && node->data &&
+        ((struct owner*)node->data)->type == OWNER_DECO) {
+      struct deco_part* part = node->data;
+      if (part->kind == DECO_EDGE)
+        name = edge_cursor(deco_edges_at(part->view, c->px, c->py));
+    }
+#endif
+    set_named_cursor(c, name);
   }
 }
 
@@ -2124,6 +2370,10 @@ static void deco_press(struct wvnc_compositor* c, struct deco_part* part,
   case DECO_CLOSE:
     wlr_xwayland_surface_close(v->xsurface);
     break;
+  case DECO_EDGE:
+    c->button_mask = mask;
+    begin_grab(v, GRAB_RESIZE, deco_edges_at(v, c->px, c->py));
+    break;
   }
 #else
   (void)c; (void)part; (void)mask;
@@ -2155,8 +2405,11 @@ void wvnc_pointer_event(struct wvnc_compositor* c, int x, int y,
     struct wlr_surface* s;
     struct wlr_scene_node* node =
       wlr_scene_node_at(&c->scene->tree.node, c->px, c->py, &sx, &sy);
-    if (node && node->type == WLR_SCENE_NODE_RECT && node->data &&
-        ((struct owner*)node->data)->type == OWNER_DECO) {
+    if (node && (node->type == WLR_SCENE_NODE_RECT ||
+                 (node->type == WLR_SCENE_NODE_BUFFER &&
+                  !wlr_scene_surface_try_from_buffer(
+                     wlr_scene_buffer_from_node(node)))) &&
+        node->data && ((struct owner*)node->data)->type == OWNER_DECO) {
       deco_press(c, node->data, mask);
       c->button_mask = mask;
       if (c->grab_mode == GRAB_NONE)

@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <stdio.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/socket.h>
@@ -74,6 +75,8 @@ ControlSocket::ControlSocket(const std::string& path_,
 
 ControlSocket::~ControlSocket()
 {
+  for (auto& w : watchers)
+    close(w.first);
   if (fd >= 0) {
     close(fd);
     unlink(path.c_str());
@@ -126,6 +129,17 @@ void ControlSocket::accept()
   size_t nl = req.find('\n');
   if (nl != std::string::npos)
     req.resize(nl);
+
+  if (req == "watch") {
+    if (!writeAll(s, "OK\n")) {
+      close(s);
+      return;
+    }
+    fcntl(s, F_SETFL, fcntl(s, F_GETFL) | O_NONBLOCK);
+    watchers[s] = std::string();
+    vlog.info(_("vncconfig QueryConnect prompt connected"));
+    return;
+  }
 
   std::string reply;
   try {
@@ -212,4 +226,88 @@ std::string ControlSocket::handle(const std::string& request)
   }
 
   return "ERR " + std::string(_("Unknown request")) + "\n";
+}
+
+void ControlSocket::addWatcherFds(std::vector<struct pollfd>* fds) const
+{
+  for (auto& w : watchers)
+    fds->push_back({ w.first, POLLIN, 0 });
+}
+
+void ControlSocket::processWatchers(const struct pollfd* fds, size_t count)
+{
+  for (size_t i = 0; i < count; i++) {
+    if (!watchers.count(fds[i].fd))
+      continue;
+    if (fds[i].revents & POLLIN)
+      readWatcher(fds[i].fd);
+    else if (fds[i].revents & (POLLHUP | POLLERR))
+      dropWatcher(fds[i].fd);
+  }
+}
+
+void ControlSocket::dropWatcher(int s)
+{
+  watchers.erase(s);
+  close(s);
+  vlog.info(_("vncconfig QueryConnect prompt disconnected"));
+}
+
+void ControlSocket::readWatcher(int s)
+{
+  char buf[256];
+  ssize_t n = read(s, buf, sizeof(buf));
+  if (n == 0 || (n < 0 && errno != EAGAIN && errno != EINTR)) {
+    dropWatcher(s);
+    return;
+  }
+  if (n < 0)
+    return;
+  std::string& line = watchers[s];
+  line.append(buf, n);
+  size_t nl;
+  while ((nl = line.find('\n')) != std::string::npos) {
+    std::string req = line.substr(0, nl);
+    line.erase(0, nl + 1);
+    unsigned long id;
+    int accept;
+    char extra;
+    if (sscanf(req.c_str(), "approve %lu %d%c", &id, &accept, &extra) == 2) {
+      if (onApprove)
+        onApprove((uint32_t)id, accept != 0);
+    } else {
+      vlog.error(_("Invalid request from vncconfig prompt: %s"),
+                 req.c_str());
+    }
+  }
+  if (line.size() > 4096)
+    dropWatcher(s);
+}
+
+static std::string clean(const char* str)
+{
+  std::string out(str ? str : "");
+  for (char& ch : out)
+    if (ch == '\t' || ch == '\n' || ch == '\r')
+      ch = ' ';
+  return out;
+}
+
+int ControlSocket::notifyQueryConnect(uint32_t id, int timeout,
+                                      const char* address, const char* user)
+{
+  std::string msg = "query\t" + std::to_string(id) + "\t" +
+                    std::to_string(timeout) + "\t" + clean(address) + "\t" +
+                    clean(user) + "\n";
+  int count = 0;
+  std::vector<int> dead;
+  for (auto& w : watchers) {
+    if (writeAll(w.first, msg))
+      count++;
+    else
+      dead.push_back(w.first);
+  }
+  for (int s : dead)
+    dropWatcher(s);
+  return count;
 }

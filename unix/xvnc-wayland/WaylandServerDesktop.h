@@ -21,6 +21,8 @@
 
 #include <string>
 
+#include <core/Timer.h>
+
 #include <rfb/SDesktop.h>
 #include <rfb/PixelBuffer.h>
 
@@ -31,6 +33,8 @@ namespace rfb { class VNCServer; }
 // rfb::SDesktop implementation backed by our own headless Wayland
 // compositor. Unlike w0vncserver this desktop *is* the display: it
 // exists for the life time of the process, like Xvnc's X server.
+class ControlSocket;
+
 class WaylandServerDesktop : public rfb::SDesktop {
 public:
   WaylandServerDesktop(int width, int height, const char* socketName,
@@ -42,6 +46,10 @@ public:
   const char* socketName() const;
   const char* xwaylandDisplay() const { return xDisplay.c_str(); }
   bool xwaylandReady() const { return xReady; }
+
+  // QueryConnect goes to the vncconfig prompt(s) on the control socket
+  void setControlSocket(ControlSocket* control_) { control = control_; }
+  void approveConnection(uint32_t id, bool accept, const char* rejectMsg);
 
   int eventFd() const;
   void dispatch();
@@ -72,6 +80,7 @@ private:
   static void cbInfo(void* data, const char* msg);
   static bool cbOutputResize(void* data, int width, int height);
 
+  void queryTimeout(core::Timer* t);
   rfb::PixelBuffer* createPixelBuffer();
   void setScreens(const rfb::ScreenSet& layout);
 
@@ -84,6 +93,12 @@ private:
   bool convert;
   std::string xDisplay;
   bool xReady;
+
+  ControlSocket* control;
+  rfb::SConnection* pendingQuery;
+  uint32_t pendingQueryId;
+  uint32_t lastQueryId;
+  core::MethodTimer<WaylandServerDesktop> queryConnectTimer;
 };
 
 #endif

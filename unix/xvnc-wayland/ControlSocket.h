@@ -30,11 +30,23 @@
 //   set <name>=<value>      only for parameters in AllowOverride
 //   connect [-view-only] <host[:port]>   reverse connection
 //   disconnect              disconnect all viewers
+//   watch                   QueryConnect: keep the connection open (the
+//                           vncconfig prompt). The server sends
+//                             query\t<id>\t<timeout>\t<address>\t<user>
+//                           per connection to accept; the client answers
+//                             approve <id> 1|0
+//                           on the same connection. Like
+//                           XVncExtSelectInput(VncExtQueryConnectMask).
 
 #ifndef __CONTROLSOCKET_H__
 #define __CONTROLSOCKET_H__
 
+#include <functional>
+#include <map>
 #include <string>
+#include <vector>
+
+struct pollfd;
 
 namespace rfb { class VNCServerST; }
 
@@ -49,12 +61,23 @@ public:
 
   const std::string& getPath() const { return path; }
 
+  // QueryConnect prompts ("watch" connections)
+  void addWatcherFds(std::vector<struct pollfd>* fds) const;
+  void processWatchers(const struct pollfd* fds, size_t count);
+  // Sends a query to every prompt; returns how many got it
+  int notifyQueryConnect(uint32_t id, int timeout, const char* address,
+                         const char* user);
+  std::function<void(uint32_t id, bool accept)> onApprove;
+
 private:
   std::string handle(const std::string& request);
+  void readWatcher(int s);
+  void dropWatcher(int s);
 
   std::string path;
   rfb::VNCServerST* server;
   int fd;
+  std::map<int, std::string> watchers;   // fd -> partial input line
 };
 
 #endif

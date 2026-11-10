@@ -637,6 +637,12 @@ int main(int argc, char** argv)
       // vncconfig finds it through this, also from inside a nested
       // compositor whose WAYLAND_DISPLAY is a different socket
       setenv("TIGERVNC_VNCCONFIG", control->getPath().c_str(), 1);
+      desktop.setControlSocket(control.get());
+      control->onApprove = [&desktop](uint32_t id, bool accept) {
+        // Same message as Xvnc's vncApproveConnection()
+        desktop.approveConnection(id, accept,
+                                  _("Connection rejected by local user"));
+      };
     } catch (std::exception& e) {
       vlog.error(_("No vncconfig control socket: %s"), e.what());
     }
@@ -701,6 +707,10 @@ int main(int argc, char** argv)
       fds.push_back({ desktop.eventFd(), POLLIN, 0 });
       fds.push_back({ signalPipe[0], POLLIN, 0 });
       fds.push_back({ control ? control->getFd() : -1, POLLIN, 0 });
+      size_t watchFirst = fds.size();
+      if (control)
+        control->addWatcherFds(&fds);
+      size_t watchCount = fds.size() - watchFirst;
       for (network::SocketListener* listener : listeners)
         fds.push_back({ listener->getFd(), POLLIN, 0 });
 
@@ -749,10 +759,12 @@ int main(int argc, char** argv)
       // Wayland clients, Xwayland, frame timers, clipboard pipes
       desktop.dispatch();
 
+      if (control && watchCount)
+        control->processWatchers(&fds[watchFirst], watchCount);
       if (control && (fds[2].revents & POLLIN))
         control->accept();
 
-      size_t idx = 3;
+      size_t idx = watchFirst + watchCount;
       for (network::SocketListener* listener : listeners) {
         if (fds[idx++].revents & POLLIN) {
           network::Socket* sock = listener->accept();

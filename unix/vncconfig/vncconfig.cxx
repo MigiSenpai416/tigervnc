@@ -25,6 +25,7 @@
 #endif
 
 #include <string.h>
+#include <strings.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
@@ -37,6 +38,7 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <string>
+#include <vector>
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -76,13 +78,46 @@ char* programName = nullptr;
 Display* dpy;
 int vncExtEventBase, vncExtErrorBase;
 
+// Wayland mode: the window talks to the server over the control socket
+// (see waylandControlPath()) instead of the VNC X extension
+static std::string waylandCtl;
+static int waylandWatchFd = -1;
+static bool waylandRequest(const std::string& path, const std::string& req,
+                           std::string* result);
+
+static bool isTrue(const char* data) {
+  // Bool parameters read back as "on"/"off" (BoolParameter::getValueStr)
+  return strcmp(data, "1") == 0 || strcasecmp(data, "on") == 0 ||
+         strcasecmp(data, "true") == 0 || strcasecmp(data, "yes") == 0;
+}
+
 static bool getBoolParam(Display* dpy_, const char* param) {
+  if (!waylandCtl.empty()) {
+    std::string v;
+    if (!waylandRequest(waylandCtl, std::string("get ") + param, &v))
+      return false;
+    while (!v.empty() && (v.back() == '\n' || v.back() == ' '))
+      v.pop_back();
+    return isTrue(v.c_str());
+  }
   char* data;
   int len;
+  bool ret = false;
   if (XVncExtGetParam(dpy_, param, &data, &len)) {
-    if (strcmp(data,"1") == 0) return true;
+    ret = isTrue(data);
+    XFree(data);
   }
-  return false;
+  return ret;
+}
+
+static void setParam(Display* dpy_, const char* param, const char* value) {
+  if (!waylandCtl.empty()) {
+    if (!waylandRequest(waylandCtl, std::string("set ") + param + "=" + value,
+                        nullptr))
+      vlog.error(_("Setting the parameter %s failed"), param);
+    return;
+  }
+  XVncExtSetParam(dpy_, param, value);
 }
 
 class VncConfigWindow : public TXWindow, public TXEventHandler,
@@ -115,7 +150,23 @@ public:
     y += sendPrimaryCB.height();
     setEventHandler(this);
     toplevel("VNC config", this, 0, nullptr, nullptr, iconic);
-    XVncExtSelectInput(dpy, win(), VncExtQueryConnectMask);
+    if (waylandCtl.empty())
+      XVncExtSelectInput(dpy, win(), VncExtQueryConnectMask);
+  }
+
+  // Wayland mode: a query from the control socket's "watch" connection
+  void waylandQuery(uint32_t id, int timeout, const char* address,
+                    const char* user) {
+    vlog.debug("Query connection event");
+    if (queryConnectDialog)
+      delete queryConnectDialog;
+    queryConnectDialog = nullptr;
+    wlQueryId = id;
+    if (timeout)
+      queryConnectDialog = new QueryConnectDialog(dpy, address, user,
+                                                  timeout, this);
+    if (queryConnectDialog)
+      queryConnectDialog->map();
   }
 
   // handleEvent()
@@ -151,36 +202,49 @@ public:
   // TXCheckboxCallback method
   void checkboxSelect(TXCheckbox* checkbox) override {
     if (checkbox == &acceptClipboard) {
-      XVncExtSetParam(dpy, ACCEPT_CUT_TEXT,
+      setParam(dpy, ACCEPT_CUT_TEXT,
                       acceptClipboard.checked() ? "1" : "0");
       setPrimaryCB.disabled(!acceptClipboard.checked());
     } else if (checkbox == &sendClipboard) {
-      XVncExtSetParam(dpy, SEND_CUT_TEXT,
+      setParam(dpy, SEND_CUT_TEXT,
                       sendClipboard.checked() ? "1" : "0");
       sendPrimaryCB.disabled(!sendClipboard.checked());
     } else if (checkbox == &setPrimaryCB) {
-      XVncExtSetParam(dpy, SET_PRIMARY,
+      setParam(dpy, SET_PRIMARY,
                       setPrimaryCB.checked() ? "1" : "0");
     } else if (checkbox == &sendPrimaryCB) {
-      XVncExtSetParam(dpy, SEND_PRIMARY,
+      setParam(dpy, SEND_PRIMARY,
                       sendPrimaryCB.checked() ? "1" : "0");
     }
   }
 
   // QueryResultCallback interface
   void queryApproved() override {
-    XVncExtApproveConnect(dpy, queryConnectId, 1);
+    approve(true);
   }
   void queryRejected() override {
-    XVncExtApproveConnect(dpy, queryConnectId, 0);
+    approve(false);
   }
 
 private:
   TXCheckbox acceptClipboard, setPrimaryCB;
   TXCheckbox sendClipboard, sendPrimaryCB;
 
+  void approve(bool accept) {
+    if (waylandCtl.empty()) {
+      XVncExtApproveConnect(dpy, queryConnectId, accept ? 1 : 0);
+      return;
+    }
+    std::string line = "approve " + std::to_string(wlQueryId) +
+                       (accept ? " 1\n" : " 0\n");
+    if (write(waylandWatchFd, line.data(), line.size()) !=
+        (ssize_t)line.size())
+      vlog.error(_("Answering the connection query failed"));
+  }
+
   QueryConnectDialog* queryConnectDialog;
   void* queryConnectId;
+  uint32_t wlQueryId = 0;
 };
 
 static void usage()
@@ -275,6 +339,31 @@ static bool waylandRequest(const std::string& path, const std::string& req,
   return true;
 }
 
+// Opens the QueryConnect "watch" connection; -1 on failure
+static int waylandWatch(const std::string& path)
+{
+  struct sockaddr_un addr;
+  int s = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+  if (s < 0 || path.size() >= sizeof(addr.sun_path)) {
+    if (s >= 0)
+      close(s);
+    return -1;
+  }
+  memset(&addr, 0, sizeof(addr));
+  addr.sun_family = AF_UNIX;
+  strcpy(addr.sun_path, path.c_str());
+  char ok[3];
+  if (connect(s, (struct sockaddr*)&addr, sizeof(addr)) < 0 ||
+      write(s, "watch\n", 6) != 6 || read(s, ok, 3) != 3 ||
+      memcmp(ok, "OK\n", 3) != 0) {
+    close(s);
+    return -1;
+  }
+  return s;
+}
+
+static void runWindow(bool wayland);
+
 static int waylandMain(const std::string& path, int argc, char** argv,
                        int i)
 {
@@ -282,10 +371,22 @@ static int waylandMain(const std::string& path, int argc, char** argv,
   int ret = 0;
 
   if (i >= argc) {
-    // The server handles the clipboard itself; there is no window to
-    // show and no QueryConnect support in Wayland mode
-    vlog.info(_("Wayland mode: the server handles the clipboard; nothing "
-                "to do without options"));
+    // Like on Xvnc: the window (clipboard settings) and the QueryConnect
+    // prompt, as an X client of Xwayland, with the control socket in
+    // place of the VNC extension
+    if (!dpy) {
+      fprintf(stderr, _("%s: Unable to open display \"%s\"\n"),
+              programName, XDisplayName(displayname));
+      return 1;
+    }
+    waylandCtl = path;
+    waylandWatchFd = waylandWatch(path);
+    if (waylandWatchFd < 0) {
+      fprintf(stderr, _("%s: Cannot connect to %s: %s\n"), programName,
+              path.c_str(), strerror(errno));
+      return 1;
+    }
+    runWindow(true);
     return 0;
   }
 
@@ -403,8 +504,10 @@ int main(int argc, char** argv)
     // Wayland mode: Xwayland has no VNC extension
     std::string ctl = waylandControlPath();
     if (!ctl.empty()) {
-      if (dpy)
+      if (dpy && i < argc) {
         XCloseDisplay(dpy);
+        dpy = nullptr;
+      }
       return waylandMain(ctl, argc, argv, i);
     }
   }
@@ -511,11 +614,19 @@ int main(int argc, char** argv)
     return 0;
   }
 
+  runWindow(false);
+  return 0;
+}
+
+static void runWindow(bool wayland)
+{
   try {
     TXWindow::init(dpy,"Vncconfig");
 
     VncConfigWindow w(dpy);
     if (!noWindow) w.map();
+
+    std::string wlInput;
 
     while (true) {
       struct timeval tv;
@@ -542,8 +653,37 @@ int main(int argc, char** argv)
       fd_set rfds;
       FD_ZERO(&rfds);
       FD_SET(ConnectionNumber(dpy), &rfds);
+      if (wayland)
+        FD_SET(waylandWatchFd, &rfds);
       int n = select(FD_SETSIZE, &rfds, nullptr, nullptr, tvp);
       if (n < 0) throw core::socket_error("select", errno);
+
+      // Wayland mode: queries from the server
+      if (wayland && FD_ISSET(waylandWatchFd, &rfds)) {
+        char buf[1024];
+        ssize_t len = read(waylandWatchFd, buf, sizeof(buf));
+        if (len <= 0) {
+          vlog.error(_("Lost the connection to the server"));
+          exit(1);
+        }
+        wlInput.append(buf, len);
+        size_t nl;
+        while ((nl = wlInput.find('\n')) != std::string::npos) {
+          std::string line = wlInput.substr(0, nl);
+          wlInput.erase(0, nl + 1);
+          // query\t<id>\t<timeout>\t<address>\t<user>
+          std::vector<std::string> f;
+          size_t pos = 0, tab;
+          while ((tab = line.find('\t', pos)) != std::string::npos) {
+            f.push_back(line.substr(pos, tab - pos));
+            pos = tab + 1;
+          }
+          f.push_back(line.substr(pos));
+          if (f.size() == 5 && f[0] == "query")
+            w.waylandQuery(strtoul(f[1].c_str(), nullptr, 10),
+                           atoi(f[2].c_str()), f[3].c_str(), f[4].c_str());
+        }
+      }
     }
 
     XCloseDisplay(dpy);
@@ -551,6 +691,4 @@ int main(int argc, char** argv)
   } catch (std::exception& e) {
     vlog.error("%s", e.what());
   }
-
-  return 0;
 }
