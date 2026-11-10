@@ -3,7 +3,7 @@
     "suite": "nested",
     "test": "sway session detected as nested compositor, clipboard bridge connected",
     "status": "PASS",
-    "detail": "server log: ['WaylandDesktop: Client pid 13 (wlroots) is a nested compositor serving', 'WaylandDesktop: Clipboard bridge to nested compositor (pid 13) ready,'] ['WaylandDesktop: Clipboard bridge to nested compositor (pid 13) ready,']",
+    "detail": "server log: ['WaylandDesktop: Client pid 12 (wlroots) is a nested compositor serving', 'WaylandDesktop: Clipboard bridge to nested compositor (pid 12) ready,'] ['WaylandDesktop: Clipboard bridge to nested compositor (pid 12) ready,']",
     "artifacts": []
   },
   {

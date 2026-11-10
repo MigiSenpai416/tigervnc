@@ -4,7 +4,7 @@
 
 | Result | Test | Detail | Artifacts |
 |---|---|---|---|
-| PASS | sway session detected as nested compositor, clipboard bridge connected | server log: ['WaylandDesktop: Client pid 13 (wlroots) is a nested compositor serving', 'WaylandDesktop: Clipboard bridge to nested compositor (pid 13) ready,'] ['WaylandDesktop: Clipboard bridge to nested compositor (pid 13) ready,'] |  |
+| PASS | sway session detected as nested compositor, clipboard bridge connected | server log: ['WaylandDesktop: Client pid 12 (wlroots) is a nested compositor serving', 'WaylandDesktop: Clipboard bridge to nested compositor (pid 12) ready,'] ['WaylandDesktop: Clipboard bridge to nested compositor (pid 12) ready,'] |  |
 | PASS | nested sway output is fullscreen and undecorated (screenshot over VNC) | foot background covers 100% of 1024x768, corners [(36, 36, 36), (36, 36, 36), (36, 36, 36), (36, 36, 36)], sway outputs [('WL-1', 0, 0, 1024, 768)] | test-artifacts/nested-01-sway-foot-fullscreen.png |
 | PASS | keyboard input reaches a client of the nested compositor (foot in sway) | file content 'nested-key-42-foot-sway' | test-artifacts/nested-02-typed.png |
 | PASS | pointer reaches nested client (double click selects word), primary nested -> viewer | primary in sway after double click: 'NESTEDPTR'; viewer received 'NESTEDPTR' (primary bridged to VNC) | test-artifacts/nested-03-selected.png |
@@ -29,14 +29,14 @@
 | Result | Test | Detail | Artifacts |
 |---|---|---|---|
 | PASS | vncsession with mode=wayland starts Xvnc-wayland as the user, XDG_SESSION_TYPE=wayland for PAM | vncsession rc=0 pid=10, port 5901 up=True, servers=[(12, 'Xvnc-wayland', 'vncuser')], server env from vncsession: XDG_SESSION_TYPE='wayland' XDG_SESSION_CLASS='user'  |  |
-| PASS | Wayland session environment | USER=vncuser, XDG_SESSION_TYPE=wayland, WAYLAND_DISPLAY=wayland-1, DISPLAY=:0, XDG_CURRENT_DESKTOP=VncTest, XDG_SESSION_DESKTOP=vnc-test, DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-GAOiZqPohM,guid=6276f56a4368558196ebd22f6af3327c |  |
+| PASS | Wayland session environment | USER=vncuser, XDG_SESSION_TYPE=wayland, WAYLAND_DISPLAY=wayland-1, DISPLAY=:0, XDG_CURRENT_DESKTOP=VncTest, XDG_SESSION_DESKTOP=vnc-test, DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-sKDhCQbySC,guid=5bd12626097ddb078f6ece726af3349a |  |
 | PASS | Wayland session visible over VNC (foot + xterm) | foot area (302, 332, 720, 512), xterm area (20, 22, 322, 128) | test-artifacts/vncsession-01-wayland-session.png |
-| PASS | session log | /home/vncuser/.local/state/tigervnc/ce952aa32e75:1.log (copied to logs/vncsession-wayland-user.log) |  |
+| PASS | session log | /home/vncuser/.local/state/tigervnc/e8f80b1583bf:1.log (copied to logs/vncsession-wayland-user.log) |  |
 | PASS | stop | vncsession exited and removed its pid file after the server stopped |  |
 | PASS | vncsession without mode keeps X11 (Xvnc + Xsession) | no mode: server env XDG_SESSION_TYPE='x11', servers=[(65, 'Xvnc', 'vncuser')], session DISPLAY=':2' | test-artifacts/vncsession-02-x11-default.png |
 | PASS | vncsession starts the stock sway session (sway.desktop) as a nested compositor | stock sway.desktop via vncsession: rc=0, sway outputs [('WL-1', 1024, 768)], server log ['WaylandDesktop: Client pid 129 (wlroots) is a nested compositor serving', 'WaylandDesktop: Clipboard bridge to nested compositor (pid 129) ready,'] (log copied to logs/vncsession-sway-user.log) | test-artifacts/vncsession-03-sway-session.png |
 | PASS | stock sway session: Super+Return opens foot, typed command runs inside sway, resize follows | Super+Return + typed command in sway's terminal: 'sway-session-42-sway'; after resize to 1280x800 sway outputs [('WL-1', 1280, 800)] | test-artifacts/vncsession-04-sway-terminal.png |
-| PASS | explicit mode=x11 behaves like the default | mode=x11: servers=[(201, 'Xvnc', 'vncuser')], XDG_SESSION_TYPE='x11', Xvnc args '/usr/bin/Xvnc :3 -geometry 1024x768 -localhost -securitytypes VncAuth -auth /home/vncuser/.Xauthority -desktop ce952aa32e75:3 (vncuser) -fp /usr/share/fonts/X11//misc -pn -rfbauth /home/vncuser/.config/tigervnc/passwd -rfbport 5903' |  |
+| PASS | explicit mode=x11 behaves like the default | mode=x11: servers=[(201, 'Xvnc', 'vncuser')], XDG_SESSION_TYPE='x11', Xvnc args '/usr/bin/Xvnc :3 -geometry 1024x768 -localhost -securitytypes VncAuth -auth /home/vncuser/.Xauthority -desktop e8f80b1583bf:3 (vncuser) -fp /usr/share/fonts/X11//misc -pn -rfbauth /home/vncuser/.config/tigervnc/passwd -rfbport 5903' |  |
 | PASS | invalid mode is rejected by vncsession and vncserver | vncsession rc=71, servers=[]; vncserver rc=255: "Invalid mode 'wayland2', must be 'x11' or 'wayland'" |  |
 | PASS | mode value is case-insensitive and whitespace-trimmed | 'mode = Wayland ': servers=[(264, 'Xvnc-wayland', 'vncuser')] XDG_SESSION_TYPE='wayland' |  |
 
@@ -65,7 +65,7 @@
 | PASS | client resize 1024x768 -> 1280x720 changes the output (viewers, wl_output mode, Xwayland screen) | viewer fb 1280x720, ExtendedDesktopSize reply status=0, second viewer 1280x720, wl_output mode (1280, 720), Xwayland 'dimensions:    1280x720 pixels (338x190 millimeters)' | test-artifacts/wayland-08-resized-1280x720.png |
 | PASS | client resize to 1000x700 | viewer fb 1000x700, wl_output mode (1000, 700), foot area (296, 320, 726, 526) | test-artifacts/wayland-09-resized-1000x700.png |
 | PASS | input still works after resize | file content 'after-resize' |  |
-| PASS | second Wayland client (weston-terminal) starts | weston-terminal pid 62, 88650 sampled pixels changed | test-artifacts/wayland-10-weston-terminal.png |
+| PASS | second Wayland client (weston-terminal) starts | weston-terminal pid 63, 88650 sampled pixels changed | test-artifacts/wayland-10-weston-terminal.png |
 | PASS | Xwayland uses a private X authority file (XAUTHORITY for the session, clients without the cookie refused) | session XAUTHORITY=/tmp/wltest/xdg-runtime/tigervnc-wayland-1.Xauthority mode=0o600; xdpyinfo with it rc=0, without it rc=1 (); Xwayland args 'Xwayland :0 -auth /tmp/wltest/xdg-runtime/tigervnc-wayland-1.Xauthority -rootless -core -terminate -listenfd 15 -listenfd 16 -displayfd 25 -wm 22' |  |
 | PASS | server survived the whole run and exits on SIGTERM | server alive until SIGTERM, exit code 0 |  |
 | PASS | -inetd (connection on stdin/stdout) | RFB over inetd stdin/stdout, 640x480 | test-artifacts/wayland-11-inetd-640x480.png |
