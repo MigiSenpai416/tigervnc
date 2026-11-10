@@ -109,9 +109,17 @@ Without `--wayland` or `mode=wayland`, nothing changes.
   `/tmp/runtime-<uid>` is used. The `WaylandDisplay` parameter overrides
   the socket name.
 * **vncserver / vncsession / systemd.**
-  * In `~/.config/tigervnc/config`, `vncserver-config-defaults` or
-    `vncserver-config-mandatory`, `mode=wayland` selects Wayland mode.
-    The default is `mode=x11`.
+  * The mode is chosen only in the config files
+    (`~/.config/tigervnc/config`, `vncserver-config-defaults`,
+    `vncserver-config-mandatory`), with `mode=x11` or `mode=wayland`.
+    Leaving it out is the same as an explicit `mode=x11`.
+  * The value is case-insensitive and surrounding whitespace is
+    ignored. The last setting wins, and the mandatory file wins over
+    the user's file.
+  * Any other value is an error: vncsession refuses to start the
+    session and logs `Invalid mode` to syslog, and vncserver exits with
+    `Invalid mode '<value>', must be 'x11' or 'wayland'`.
+  * There is no per-display mode in `vncserver.users`.
   * vncserver: `session=` then refers to
     `/usr/share/wayland-sessions/*.desktop`, and the X-only defaults
     (`auth`, `fp`, `pn`) are not passed on.

@@ -140,9 +140,11 @@ LoadConfig($vncSystemConfigMandatoryFile, 1);
 # Xvnc parameter, so it is not passed on.
 #
 
+# "mode=x11" is the same as no mode at all
 $sessionMode = lc(delete $config{'mode'} // 'x11');
+$sessionMode =~ s/^\s+|\s+$//g;
 if ($sessionMode ne 'x11' && $sessionMode ne 'wayland') {
-  die "Unknown mode '$sessionMode', must be 'x11' or 'wayland'\n";
+  die "Invalid mode '$sessionMode', must be 'x11' or 'wayland'\n";
 }
 
 if ($sessionMode eq 'wayland') {

@@ -219,4 +219,62 @@ def t_x11_default():
 
 s.run("vncsession without mode keeps X11 (Xvnc + Xsession)", t_x11_default)
 stop_session(state.get("pid2") or 0, ":2")
+
+
+def t_explicit_x11():
+    set_config("mode=x11\nsession=vnc-test-x11\nsecuritytypes=VncAuth\n"
+               "geometry=1024x768\nlocalhost\n")
+    rc, pid, out = start_session(":3")
+    up = wait_tcp(5903, timeout=20)
+    procs = server_procs()
+    srv = [p for p in procs if p[1] == "Xvnc" and p[2] == USER]
+    env = proc_env(srv[0][0], USER) if srv else {}
+    rc2, args = sh(["ps", "-o", "args=", "-p", str(srv[0][0])]) if srv \
+        else (1, "")
+    ok = (rc == 0 and up and bool(srv) and
+          env.get("XDG_SESSION_TYPE") == "x11" and
+          "--wayland" not in args and "-mode" not in args)
+    stop_session(pid or 0, ":3")
+    return ok, ("mode=x11: servers=%r, XDG_SESSION_TYPE=%r, Xvnc args "
+                "%r" % (procs, env.get("XDG_SESSION_TYPE"), args.strip()))
+
+
+def t_invalid_mode():
+    set_config("mode=wayland2\nsession=vnc-test\nsecuritytypes=VncAuth\n"
+               "localhost\n")
+    rc, pid, out = start_session(":4")
+    time.sleep(2)
+    procs = server_procs()
+    ok = rc != 0 and not procs and \
+        not os.path.exists("/run/vncsession-:4.pid")
+    # vncserver itself (e.g. run by hand) validates the same way
+    r = subprocess.run(["runuser", "-u", USER, "--", "env",
+                        "HOME=" + HOME, "USER=" + USER,
+                        "/usr/libexec/vncserver", ":4"],
+                       capture_output=True, timeout=20)
+    msg = (r.stdout + r.stderr).decode().strip()
+    ok = ok and r.returncode != 0 and "Invalid mode 'wayland2'" in msg
+    return ok, ("vncsession rc=%d, servers=%r; vncserver rc=%d: %r" %
+                (rc, procs, r.returncode, msg))
+
+
+def t_mode_case():
+    set_config("mode = Wayland \nsession=vnc-test\n"
+               "securitytypes=VncAuth\nlocalhost\n")
+    rc, pid, out = start_session(":5")
+    up = wait_tcp(5905, timeout=20)
+    procs = server_procs()
+    srv = [p for p in procs if p[1] == "Xvnc-wayland"]
+    env = proc_env(srv[0][0], USER) if srv else {}
+    stop_session(pid or 0, ":5")
+    return (rc == 0 and up and bool(srv) and
+            env.get("XDG_SESSION_TYPE") == "wayland"), \
+        "'mode = Wayland ': servers=%r XDG_SESSION_TYPE=%r" % (
+            procs, env.get("XDG_SESSION_TYPE"))
+
+
+s.run("explicit mode=x11 behaves like the default", t_explicit_x11)
+s.run("invalid mode is rejected by vncsession and vncserver",
+      t_invalid_mode)
+s.run("mode value is case-insensitive and whitespace-trimmed", t_mode_case)
 sys.exit(s.finish())

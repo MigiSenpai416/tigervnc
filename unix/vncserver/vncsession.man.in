@@ -69,8 +69,11 @@ one of the files in \fI/usr/share/xsessions\fP. E.g. if there is a file called
 
 The special option
 .B mode
-selects between an X11 session (\fBmode=x11\fP, the default) and a Wayland
-session (\fBmode=wayland\fP). In Wayland mode the server is started as
+selects between an X11 session (\fBmode=x11\fP) and a Wayland session
+(\fBmode=wayland\fP). Leaving it out is the same as \fBmode=x11\fP. The
+value is case-insensitive; any other value is an error and the session is
+not started. As with other options, the last setting wins, and
+\fIvncserver-config-mandatory\fP overrides the user's file. In Wayland mode the server is started as
 \fBXvnc --wayland\fP, \fBsession\fP refers to the files in
 \fI/usr/share/wayland-sessions\fP instead, the X server only options
 \fBauth\fP, \fBfp\fP and \fBpn\fP are not passed on, and the session runs

@@ -366,7 +366,7 @@ switch_user(const char *username, uid_t uid, gid_t gid)
  * opened, so we have to peek at the same files here.
  */
 
-enum session_mode { MODE_UNSET = 0, MODE_X11, MODE_WAYLAND };
+enum session_mode { MODE_UNSET = 0, MODE_X11, MODE_WAYLAND, MODE_INVALID };
 
 static enum session_mode
 read_mode(FILE *f, enum session_mode mode)
@@ -401,8 +401,13 @@ read_mode(FILE *f, enum session_mode mode)
             mode = MODE_WAYLAND;
         else if (strcasecmp(p, "x11") == 0)
             mode = MODE_X11;
-        else
-            syslog(LOG_WARNING, "Unknown session mode \"%s\", ignoring", p);
+        else {
+            /* Same rule as vncserver: the last value counts and must be
+               "x11" or "wayland" */
+            syslog(LOG_CRIT, "Invalid mode \"%s\", must be \"x11\" or "
+                   "\"wayland\"", p);
+            mode = MODE_INVALID;
+        }
     }
 
     return mode;
@@ -478,7 +483,8 @@ read_user_mode(const struct passwd *pwent, enum session_mode mode)
     while (waitpid(pid, &status, 0) < 0 && errno == EINTR)
         ;
 
-    if (len == 1 && (result == MODE_X11 || result == MODE_WAYLAND))
+    if (len == 1 && (result == MODE_X11 || result == MODE_WAYLAND ||
+                     result == MODE_INVALID))
         mode = (enum session_mode)result;
 
     return mode;
@@ -500,7 +506,10 @@ get_session_mode(const char *username)
     mode = read_mode_path(CMAKE_INSTALL_FULL_SYSCONFDIR
                           "/tigervnc/vncserver-config-mandatory", mode);
 
-    return mode == MODE_WAYLAND ? MODE_WAYLAND : MODE_X11;
+    if (mode == MODE_UNSET)
+        mode = MODE_X11;   /* the default, same as an explicit mode=x11 */
+
+    return mode;
 }
 
 static int
@@ -796,8 +805,14 @@ main(int argc, char **argv)
 
     /* Indicate that this is a graphical user session. We need to do
        this here before PAM as pam_systemd.so looks at these. */
+    enum session_mode mode = get_session_mode(username);
+    if (mode == MODE_INVALID) {
+        syslog(LOG_CRIT, "Invalid mode in the vncserver configuration");
+        return EX_CONFIG;
+    }
+
     if ((putenv("XDG_SESSION_CLASS=user") < 0) ||
-        (putenv(get_session_mode(username) == MODE_WAYLAND ?
+        (putenv(mode == MODE_WAYLAND ?
                 "XDG_SESSION_TYPE=wayland" :
                 "XDG_SESSION_TYPE=x11") < 0)) {
         syslog(LOG_CRIT, "putenv: %s", strerror(errno));
