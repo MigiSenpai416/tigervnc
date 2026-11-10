@@ -29,9 +29,11 @@ case "$BASE" in
     EXTRA=(--build-arg NESTED_WLROOTS_FIX=1) ;;
   ubuntu:18.04)
     # no foot/sway/labwc/wlr-randr/wayland-info/wl-clipboard in 18.04; its
-    # python 3.6 is too old for the tests -> python3.8 + Pillow from PyPI
+    # python 3.6 is too old for the tests -> python3.8 + the Pillow wheel
+    # from PyPI (pinned; bionic's python3.8 cannot bootstrap pip)
     PKGS="$COMMON python3.8 python3.8-venv"
-    EXTRA=(--build-arg TEST_PYTHON=python3.8 --build-arg PIP_PACKAGES=pillow) ;;
+    PILLOW=https://files.pythonhosted.org/packages/84/4c/69bbed9e436ac22f9ed193a2b64f64d68fcfbc9f4106249dc7ed4889907b/pillow-10.4.0-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl#7a8d4bade9952ea9a77d0c3e49cbd8b2890a399422258a77f357b9cc9be8d680
+    EXTRA=(--build-arg TEST_PYTHON=python3.8 --build-arg "PY_WHEELS=$PILLOW") ;;
   *) echo "unsupported BASE_IMAGE $BASE (ubuntu:26.04 or ubuntu:18.04)" >&2; exit 2 ;;
 esac
 
