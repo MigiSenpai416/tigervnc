@@ -74,7 +74,8 @@ def t_headless_start():
         return False, "session command did not start"
     env = read_env_file(session_env)
     app_env = dict(base_env)
-    for k in ("WAYLAND_DISPLAY", "DISPLAY", "XDG_SESSION_TYPE"):
+    for k in ("WAYLAND_DISPLAY", "DISPLAY", "XDG_SESSION_TYPE",
+              "XAUTHORITY"):
         if k in env:
             app_env[k] = env[k]
     ok = (env.get("WAYLAND_DISPLAY") == "wayland-%d" % DISPLAY_NUM and
@@ -470,6 +471,27 @@ def t_weston_terminal():
 
 s.run("second Wayland client (weston-terminal) starts", t_weston_terminal)
 
+
+def t_xauth():
+    xa = app_env.get("XAUTHORITY", "")
+    st = os.stat(xa) if xa and os.path.exists(xa) else None
+    rc1, out1 = sh(["xdpyinfo"], env=app_env)
+    bad = dict(app_env)
+    bad["XAUTHORITY"] = os.path.join(WORK, "no-such-file")
+    rc2, out2 = sh(["xdpyinfo"], env=bad)
+    rc3, args = sh("ps -C Xwayland -o args=")
+    ok = (st is not None and (st.st_mode & 0o077) == 0 and rc1 == 0 and
+          rc2 != 0 and "-auth " + xa in args)
+    return ok, ("session XAUTHORITY=%s mode=%s; xdpyinfo with it rc=%d, "
+                "without it rc=%d (%s); Xwayland args %r" % (
+                    xa, oct(st.st_mode & 0o777) if st else None, rc1, rc2,
+                    out2.strip().splitlines()[0] if out2.strip() else "",
+                    args.strip()))
+
+
+s.run("Xwayland uses a private X authority file (XAUTHORITY for the "
+      "session, clients without the cookie refused)", t_xauth)
+
 vnc.close()
 
 
@@ -512,4 +534,101 @@ def t_inetd():
 
 
 s.run("-inetd (connection on stdin/stdout)", t_inetd)
+
+
+def start_small(num, extra, session):
+    import subprocess
+    log = open(s.artifact("logs/wayland-server-%d.log" % num), "wb")
+    return subprocess.Popen(["Xvnc", "--wayland", ":%d" % num,
+                             "-SecurityTypes", "VncAuth", "-rfbauth",
+                             passwd, "-localhost", "-geometry",
+                             "640x480"] + extra + ["--"] + session,
+                            stdout=log, stderr=subprocess.STDOUT,
+                            env=base_env, start_new_session=True)
+
+
+def t_persist():
+    p = start_small(3, [], ["sh", "-c", "exit 3"])
+    try:
+        up = wait_tcp(5903, timeout=20)
+        time.sleep(4)   # the session is long gone by now
+        alive = p.poll() is None
+        c = RFBClient(port=5903, security="VncAuth", password=PASSWORD)
+        c.refresh()
+        size = (c.width, c.height)
+        c.close()
+    finally:
+        os.killpg(p.pid, 15)
+        p.wait(10)
+    log = open(s.artifact("logs/wayland-server-3.log")).read()
+    ok = up and alive and size == (640, 480) and \
+        "Session exited with status 3" in log and "keeps running" in log
+    return ok, ("session exited (status 3), server still running=%s, "
+                "viewer connected afterwards at %dx%d" % (alive, *size))
+
+
+def t_exit_with_session():
+    p = start_small(4, ["-ExitWithSession"], ["sh", "-c", "sleep 3"])
+    up = wait_tcp(5904, timeout=20)
+    try:
+        p.wait(20)
+    except Exception:
+        os.killpg(p.pid, 9)
+        return False, "server still running 20 s after the session ended"
+    return up and p.returncode == 0, \
+        "-ExitWithSession: server exited with %s after the session" % \
+        p.returncode
+
+
+s.run("display persists after the session command exits (like Xvnc)",
+      t_persist)
+s.run("-ExitWithSession stops the server with the session (used by "
+      "vncserver)", t_exit_with_session)
+
+
+def t_depth16():
+    p = start_small(5, ["-depth", "16"], ["foot", "-W", "40x10"])
+    try:
+        wait_tcp(5905, timeout=20)
+        c = RFBClient(port=5905, security="VncAuth", password=PASSWORD)
+        pf = c.server_pf
+        end = time.time() + 15
+        box = None
+        while time.time() < end and not box:
+            time.sleep(1)
+            c.refresh()
+            # foot's background through RGB565 and back
+            box = find_colour_bbox(c, FOOT_BG, tolerance=8, min_run=60)
+        shot = c.screenshot(s.artifact("wayland-12-depth16.png"))
+        corner = c.pixel(2, 2)
+        c.close()
+    finally:
+        os.killpg(p.pid, 15)
+        p.wait(10)
+    ok = pf[0] == 16 and pf[1] == 16 and box is not None and \
+        all(abs(a - b) <= 8 for a, b in zip(corner, (46, 51, 63)))
+    return ok, ("server pixel format bpp=%d depth=%d; foot found at %r; "
+                "background %r" % (pf[0], pf[1], box, corner)), [shot]
+
+
+s.run("-depth 16: native RGB565 framebuffer, picture correct", t_depth16)
+
+
+def t_ignored_x_options():
+    p = start_small(6, ["-dpi", "96", "-ac", "-fp", "/nonexistent",
+                        "-noreset", "-pn"], ["sleep", "30"])
+    try:
+        up = wait_tcp(5906, timeout=20)
+    finally:
+        os.killpg(p.pid, 15)
+        p.wait(10)
+    log = open(s.artifact("logs/wayland-server-6.log")).read()
+    warned = [o for o in ("-dpi", "-ac", "-fp", "-noreset", "-pn")
+              if "option '%s' has no effect" % o in log]
+    return up and len(warned) == 5, \
+        "server started=%s, warnings for %r" % (up, warned)
+
+
+s.run("X-only options (-dpi -ac -fp -noreset -pn) are ignored with a "
+      "warning instead of refused", t_ignored_x_options)
 sys.exit(s.finish())
