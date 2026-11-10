@@ -1,5 +1,5 @@
 
-Tue Nov 10 13:22:06 2026
+Tue Nov 10 15:30:02 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-11.Xauthority
  Main:        Wayland display wayland-11 created in /tmp/wltest/xdg-runtime
@@ -7,16 +7,16 @@ Tue Nov 10 13:22:06 2026
  Main:        Listening for VNC connections on local interfaces, port 5911
  Main:        vncconfig control socket:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-11.vncconfig
- Connections: Accepted: 127.0.0.1::34752
- VNCSConnST:  Closing 127.0.0.1::34752: Clean disconnection
+ Connections: Accepted: 127.0.0.1::57990
+ VNCSConnST:  Closing 127.0.0.1::57990: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::34752
+ Connections: Closed: 127.0.0.1::57990
 Xwayland glamor: GBM Wayland interfaces not available
 Failed to initialize glamor, falling back to sw
  WaylandDesktop: Xwayland ready on DISPLAY=:0
- Main:        Started session 'sh' (pid 243)
+ Main:        Started session 'sh' (pid 245)
 The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Unsupported maximum keycode 708, clipping.
 >                   X11 cannot support keycodes above 255.
@@ -25,20 +25,20 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::34756
+ Connections: Accepted: 127.0.0.1::58002
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VncAuth(2)
  VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
  VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
-00:00:21.301 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 330, value 6291468
-00:00:21.301 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 332, value 6291468
-00:00:21.301 [ERROR] [xwayland/xwm.c:1920] xcb error: op ChangeProperty (no minor), code Window (no extension), sequence 335, value 6291468
-00:00:21.302 [ERROR] [xwayland/xwm.c:1920] xcb error: op DeleteProperty (no minor), code Window (no extension), sequence 336, value 6291468
-00:00:21.302 [ERROR] [xwayland/xwm.c:1920] xcb error: op DeleteProperty (no minor), code Window (no extension), sequence 339, value 6291468
+00:00:21.296 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 332, value 6291468
+00:00:21.296 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 334, value 6291468
+00:00:21.296 [ERROR] [xwayland/xwm.c:1920] xcb error: op ChangeProperty (no minor), code Window (no extension), sequence 337, value 6291468
+00:00:21.296 [ERROR] [xwayland/xwm.c:1920] xcb error: op DeleteProperty (no minor), code Window (no extension), sequence 338, value 6291468
+00:00:21.296 [ERROR] [xwayland/xwm.c:1920] xcb error: op DeleteProperty (no minor), code Window (no extension), sequence 341, value 6291468
 
-Tue Nov 10 13:22:28 2026
+Tue Nov 10 15:30:23 2026
  Main:        Terminating
- VNCSConnST:  Closing 127.0.0.1::34756: read: Connection reset by peer (104)
+ VNCSConnST:  Closing 127.0.0.1::58002: read: Connection reset by peer (104)
  EncodeManager: Framebuffer updates: 10
  EncodeManager:   Raw:
  EncodeManager:     Solid: 76 rects, 2.79468 Mpixels

@@ -1,10 +1,10 @@
 Using desktop session vnc-test
 
-New '8d638dfe37b1:1 (vncuser)' Wayland desktop is 8d638dfe37b1:1
+New '86ea95366efd:1 (vncuser)' Wayland desktop is 86ea95366efd:1
 
 Starting Wayland desktop session vnc-test
 
-Tue Nov 10 13:23:35 2026
+Tue Nov 10 15:31:31 2026
  Main:        XDG_RUNTIME_DIR not set, using /tmp/runtime-1001
  Main:        Xwayland authority file:
               /tmp/runtime-1001/tigervnc-wayland-1.Xauthority
@@ -24,13 +24,13 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::54580
- VNCSConnST:  Closing 127.0.0.1::54580: Clean disconnection
+ Connections: Accepted: 127.0.0.1::56918
+ VNCSConnST:  Closing 127.0.0.1::56918: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::54580
- Connections: Accepted: 127.0.0.1::54586
+ Connections: Closed: 127.0.0.1::56918
+ Connections: Accepted: 127.0.0.1::56930
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VeNCrypt(19)
  SVeNCrypt:   Client requests security type TLSVnc (258)

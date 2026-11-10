@@ -1,5 +1,5 @@
 
-Tue Nov 10 13:21:27 2026
+Tue Nov 10 15:29:23 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-7.Xauthority
  Main:        Wayland display wayland-7 created in /tmp/wltest/xdg-runtime
@@ -29,7 +29,7 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
 
-Tue Nov 10 13:21:28 2026
+Tue Nov 10 15:29:24 2026
  Main:        Terminating
  VNCSConnST:  Closing ::0: Clean disconnection
  EncodeManager: Framebuffer updates: 1

@@ -4,7 +4,7 @@ warn: wayland.c:1794: compositor does not implement the XDG toplevel icon protoc
 warn: wayland.c:1799: text input interface not implemented by compositor; IME will be disabled
 warn: wayland.c:2061: no decoration manager available - using CSDs unconditionally
 warn: wayland.c:1652: unknown global removed: 0x00000013
- err: wayland.c:1675: failed to read events from the Wayland socket: Broken pipe
+warn: wayland.c:1690: disconnected from Wayland
  err: wayland.c:2318: failed to roundtrip Wayland display: Broken pipe
  err: wayland.c:2318: failed to roundtrip Wayland display: Broken pipe
  err: wayland.c:2318: failed to roundtrip Wayland display: Broken pipe

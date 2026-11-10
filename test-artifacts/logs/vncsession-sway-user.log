@@ -1,10 +1,10 @@
 Using desktop session sway
 
-New '8d638dfe37b1:6 (vncuser)' Wayland desktop is 8d638dfe37b1:6
+New '86ea95366efd:6 (vncuser)' Wayland desktop is 86ea95366efd:6
 
 Starting Wayland desktop session sway
 
-Tue Nov 10 13:24:01 2026
+Tue Nov 10 15:31:57 2026
  Main:        XDG_RUNTIME_DIR not set, using /tmp/runtime-1001
  Main:        Xwayland authority file:
               /tmp/runtime-1001/tigervnc-wayland-6.Xauthority
@@ -24,19 +24,17 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
-
-Tue Nov 10 13:24:02 2026
  WaylandDesktop: Client pid 129 (wlroots) is a nested compositor serving
               /tmp/runtime-1001/wayland-1, giving it the whole screen
  WaylandDesktop: Connecting clipboard bridge to /tmp/runtime-1001/wayland-1
 sh: 1: systemctl: not found
-2026-11-10 13:24:02 - [main.c:278] Could not find config for output WL-1 ((null))
  WaylandDesktop: Clipboard bridge to nested compositor (pid 129) ready,
               wlr-data-control v2
-00:00:00.009 [INFO] [swaybar/tray/icon.c:339] Warning: no icon themes loaded
- Connections: Accepted: 127.0.0.1::55866
- VNCSConnST:  Closing 127.0.0.1::55866: Clean disconnection
+2026-11-10 15:31:57 - [main.c:278] Could not find config for output WL-1 ((null))
+00:00:00.006 [INFO] [swaybar/tray/icon.c:339] Warning: no icon themes loaded
+ Connections: Accepted: 127.0.0.1::45180
+ VNCSConnST:  Closing 127.0.0.1::45180: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::55866
+ Connections: Closed: 127.0.0.1::45180

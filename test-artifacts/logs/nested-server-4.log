@@ -1,5 +1,5 @@
 
-Tue Nov 10 13:23:28 2026
+Tue Nov 10 15:31:24 2026
  Main:        Xwayland authority file:
               /tmp/nestedtest/rt-4/tigervnc-wayland-4.Xauthority
  Main:        Wayland display wayland-4 created in /tmp/nestedtest/rt-4
@@ -10,7 +10,7 @@ Tue Nov 10 13:23:28 2026
 Xwayland glamor: GBM Wayland interfaces not available
 Failed to initialize glamor, falling back to sw
  WaylandDesktop: Xwayland ready on DISPLAY=:0
- Main:        Started session '/tmp/nestedtest/session-4.sh' (pid 120)
+ Main:        Started session '/tmp/nestedtest/session-4.sh' (pid 121)
 The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Unsupported maximum keycode 708, clipping.
 >                   X11 cannot support keycodes above 255.
@@ -19,22 +19,22 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::55850
- VNCSConnST:  Closing 127.0.0.1::55850: Clean disconnection
+ Connections: Accepted: 127.0.0.1::50698
+ VNCSConnST:  Closing 127.0.0.1::50698: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::55850
+ Connections: Closed: 127.0.0.1::50698
 
-Tue Nov 10 13:23:32 2026
- Connections: Accepted: 127.0.0.1::55862
+Tue Nov 10 15:31:28 2026
+ Connections: Accepted: 127.0.0.1::39174
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VncAuth(2)
  VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
  VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
 
-Tue Nov 10 13:23:34 2026
- VNCSConnST:  Closing 127.0.0.1::55862: Clean disconnection
+Tue Nov 10 15:31:29 2026
+ VNCSConnST:  Closing 127.0.0.1::39174: Clean disconnection
  EncodeManager: Framebuffer updates: 1
  EncodeManager:   Raw:
  EncodeManager:     Solid: 15 rects, 785.376 kpixels
@@ -43,6 +43,6 @@ Tue Nov 10 13:23:34 2026
  EncodeManager:                  4.13672 KiB (1:1 ratio)
  EncodeManager:   Total: 16 rects, 786.432 kpixels
  EncodeManager:          3.00018 MiB (1:1 ratio)
- Connections: Closed: 127.0.0.1::55862
+ Connections: Closed: 127.0.0.1::39174
  Main:        Terminating
  Main:        Terminated

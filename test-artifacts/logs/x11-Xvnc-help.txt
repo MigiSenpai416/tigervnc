@@ -134,7 +134,7 @@ Parameter names are case-insensitive.  The parameters are:
   CompareFB      - Perform pixel comparison on framebuffer to reduce
                    unnecessary updates (0: never, 1: always, 2: auto)
                    (default=2)
-  desktop        - Name of VNC desktop (default=vncuser@7431777df539)
+  desktop        - Name of VNC desktop (default=vncuser@658cee423bda)
   DisconnectClients - Disconnect existing clients if an incoming connection is
                    non-shared. If combined with NeverShared then new
                    connections will be refused while there is a client active
