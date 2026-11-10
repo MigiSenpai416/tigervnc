@@ -48,7 +48,8 @@ RUN if [ -n "$http_proxy" ]; then \
     if [ -n "$PY_WHEELS" ]; then \
       $TEST_PYTHON -m venv --without-pip /opt/testpy && \
       /opt/testpy/bin/python3 -c 'exec("import hashlib, io, sys, sysconfig, urllib.request, zipfile\nfor w in sys.argv[1:]:\n    url, sha = w.split(\x27#\x27)\n    data = urllib.request.urlopen(url, timeout=120).read()\n    assert hashlib.sha256(data).hexdigest() == sha, url\n    zipfile.ZipFile(io.BytesIO(data)).extractall(sysconfig.get_paths()[\x27purelib\x27])")' $PY_WHEELS && \
-      ln -sf /opt/testpy/bin/python3 /usr/local/bin/python3; \
+      printf '#!/bin/sh\nexec /opt/testpy/bin/python3 "$@"\n' > /usr/local/bin/python3 && \
+      chmod 755 /usr/local/bin/python3 && /usr/local/bin/python3 -c "import PIL"; \
     fi && \
     rm -rf /var/lib/apt/lists/* /etc/apt/apt.conf.d/80proxy
 COPY --from=wlroots-fix /out/ /tmp/wlroots-fix/

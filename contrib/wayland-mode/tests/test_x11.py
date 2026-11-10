@@ -29,11 +29,49 @@ env = {k: v for k, v in os.environ.items()
        if k not in ("DISPLAY", "WAYLAND_DISPLAY")}
 
 
+def elf_needed(path):
+    """DT_NEEDED entries of an ELF64 little-endian file (no binutils in
+    the runtime images)."""
+    import struct
+    with open(path, "rb") as f:
+        data = f.read()
+    shoff, = struct.unpack_from("<Q", data, 0x28)
+    shentsize, shnum = struct.unpack_from("<HH", data, 0x3a)
+    secs = [struct.unpack_from("<IIQQQQIIQQ", data, shoff + i * shentsize)
+            for i in range(shnum)]
+    out = []
+    for sec in secs:
+        if sec[1] != 6:          # SHT_DYNAMIC
+            continue
+        strtab = secs[sec[6]]
+        for off in range(sec[4], sec[4] + sec[5], 16):
+            tag, val = struct.unpack_from("<qQ", data, off)
+            if tag == 0:
+                break
+            if tag == 1:         # DT_NEEDED
+                start = strtab[4] + val
+                out.append(data[start:data.index(b"\0", start)].decode())
+    return out, data
+
+
 def t_no_wlroots():
+    # Xvnc itself: no wlroots/wayland-server in its NEEDED entries and
+    # none linked in statically (no wlroots/libwayland-server symbols).
+    # ldd may still show libwayland-server reached through a system
+    # library (Ubuntu 18.04's Mesa libgbm links it); that is the distro's
+    # libgbm, which stock Xvnc loads the same way, and is reported only.
+    needed, data = elf_needed("/usr/bin/Xvnc")
+    direct = [n for n in needed if "wlroots" in n or "wayland" in n]
+    static = sorted({m.decode() for m in __import__("re").findall(
+        rb"\b(wlr_[a-z_]+|wl_display_create|wl_global_create)\b", data)})[:5]
     rc, out = sh(["ldd", "/usr/bin/Xvnc"])
-    bad = [l for l in out.splitlines() if "wlroots" in l or
-           "wayland-server" in l]
-    return rc == 0 and not bad, "Xvnc links wlroots/wayland-server: %r" % bad
+    trans = [l.strip().split()[0] for l in out.splitlines()
+             if "wlroots" in l or "wayland" in l]
+    ok = rc == 0 and not direct and not static and \
+        not any("wlroots" in t for t in trans)
+    return ok, ("Xvnc NEEDED %r: wayland/wlroots %r; wlroots/wayland-server "
+                "symbols in the binary %r; via system libraries (ldd) %r" %
+                (needed, direct, static, trans))
 
 
 def t_help():
