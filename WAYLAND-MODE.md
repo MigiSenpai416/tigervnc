@@ -432,6 +432,13 @@ Run with `contrib/wayland-mode/run-tests.sh`. Results are in
 
 ## Limitations / known gaps
 
+* Only stable xdg-shell (`xdg_wm_base`). The compositor uses wlroots 0.19,
+  which no longer has the old `zxdg_shell_v6` or `wl_shell`, so Wayland
+  clients that know only those can't open a window. An example is
+  weston 3.0's `weston-terminal` on Ubuntu 18.04, which asserts in
+  `window_create_internal` and shows nothing. This is the one Wayland
+  failure in the 18.04 tarball run. X11 clients (via Xwayland) and
+  current Wayland clients are not affected.
 * One output of our own. A multi-screen layout from the viewer drives
   window placement, maximize and fullscreen, and nested compositor
   outputs, but Wayland clients and Xwayland see one `wl_output` and one
