@@ -34,6 +34,7 @@ Without `--wayland` or `mode=wayland`, nothing changes.
         |                    or whole screens for a nested compositor |
         | nested_bridge.c    wlr-data-control client to a nested      |
         |                    compositor: clipboard + primary bridge   |
+        | ControlSocket.cxx  vncconfig's way in (no VNC X extension)  |
         +-------------------------------------------------------------+
                      shared: common/rfb, rdr, network, core
 ```
@@ -57,8 +58,20 @@ Without `--wayland` or `mode=wayland`, nothing changes.
   `-X509Key`, `-PlainUsers`, `-pam_service`, `-AcceptCutText`,
   `-SendCutText`, `-SetPrimary`, `-SendPrimary`, `-MaxClipboard`,
   `-AlwaysShared`, `-IdleTimeout` and the rest behave identically.
-  `-geometry`, `-depth 24`, `-pixelformat rgb888` and `-inetd` are
-  accepted as in Xvnc.
+  `-geometry`, `-depth`, `-pixelformat` and `-inetd` are accepted as in
+  Xvnc.
+* **Depths.** The compositor always renders XRGB8888. With `-depth 8`,
+  `15`, `16` or `32`, or a `-pixelformat` such as `rgb565` or `bgr888`,
+  the server's native pixel format is that format (the same ones Xvnc
+  picks for each depth), and damaged areas are converted into a
+  separate buffer. Viewers see it in `ServerInit` and can still ask for
+  any format. `-depth 24`/`rgb888` uses the compositor's buffer directly.
+* **X server options with no meaning here** (`-auth`, `-fp`, `-pn`,
+  `-dpi`, `-ac`, `-noreset`, `-co`, `-xkbdir`, `-nolisten`, `-s`,
+  `-dpms`, `+extension`, ... see `ignoredXOptions` in
+  `xvnc-wayland.cxx`) are skipped with the warning
+  `option '-dpi' has no effect in Wayland mode`, so existing configs
+  and scripts keep working. Unknown options are still errors.
 * **Compositor** (`unix/xvnc-wayland/compositor.c`):
   * wlroots 0.19 with the headless backend, the pixman renderer and one
     XRGB8888 output.
@@ -68,8 +81,18 @@ Without `--wayland` or `mode=wayland`, nothing changes.
   * Input:
     * Keyboard events go to a virtual `wlr_keyboard`, with the keymap
       from `XKB_DEFAULT_*`. Keysyms are mapped to keycodes, faking
-      Shift/AltGr where needed. With `RawKeyboard`, QEMU extended key
-      events use the raw keycode.
+      Shift/AltGr where needed. Candidates are tried on a copy of the
+      real XKB state, so a locked NumLock or CapsLock is taken into
+      account. With `RawKeyboard`, QEMU extended key events use the raw
+      keycode.
+    * `AvoidShiftNumLock` (default on) works as in Xvnc: if a keypad
+      key would need a fake Shift (e.g. `XK_KP_Left` while NumLock is
+      on), the equivalent key outside the keypad is used instead. A
+      keypad keysym that is only reachable by changing NumLock (e.g.
+      `XK_KP_4` with NumLock off) is sent as the plain key (`4`).
+    * The LED state is reported from the start. Without it, the RFB
+      core would ignore lock keys and skip its NumLock/CapsLock
+      synchronisation for viewers that do not track LEDs.
     * Pointer events go to the seat, including the wheel and buttons
       8/9 as side/extra.
     * Viewer key auto-repeat is dropped, because Wayland clients repeat
@@ -78,12 +101,27 @@ Without `--wayland` or `mode=wayland`, nothing changes.
     as the VNC cursor.
 * **Minimal window manager policy.**
   * Floating, stacking windows.
-  * New xdg toplevels are centred and cascaded. X11 windows go where
-    they ask to be.
+  * New xdg toplevels are centred and cascaded on the screen that holds
+    the pointer. X11 windows go where they ask to be.
+  * Multi-monitor: the viewer's `SetDesktopSize` screen layout is
+    used. Maximize and fullscreen fill the screen the window is on (its
+    centre), minus panel exclusive zones; a window that asks to start
+    maximized or fullscreen gets the screen with the pointer. Without a
+    layout, or after a resize without one, there is one screen.
   * Click to focus and raise.
   * Move and resize through client-side decorations (xdg
     `move`/`resize` requests and `_NET_WM_MOVERESIZE`).
-  * Maximize and fullscreen requests are honoured.
+  * X11 title bars (`X11TitleBars`, default on): managed X11 windows
+    get a 22 pixel server-side bar. Dragging it moves the window, and it
+    has maximize/restore and close (`WM_DELETE_WINDOW`) buttons. It is
+    blue when focused and grey otherwise. There is no title text, since
+    the compositor has no font renderer. Windows that ask for no title
+    through `_MOTIF_WM_HINTS`, override-redirect windows and fullscreen
+    windows get no bar. A window whose bar would be off the top edge is
+    moved down to make room.
+  * Maximize and fullscreen requests are honoured, including requests
+    that arrive between the first commit and the first map (e.g.
+    `foot --fullscreen`).
   * Popups are constrained to the output.
   * layer-shell (panels, backgrounds, launchers) is supported, with an
     exclusive-zone usable area.
@@ -138,17 +176,48 @@ Without `--wayland` or `mode=wayland`, nothing changes.
 * **Client-driven resize.** `SetDesktopSize` changes the output's custom
   mode. Wayland clients see a new `wl_output` mode and Xwayland resizes
   its screen. All viewers get `ExtendedDesktopSize`. Our single output
-  covers the whole framebuffer. Multi-screen layouts are used to place
-  the outputs of a nested compositor (see above), and are otherwise only
-  metadata.
+  covers the whole framebuffer; the screen layout drives the window
+  manager (see above) and the outputs of a nested compositor.
+* **wlr-output-management.** `wlr-randr`, `kanshi` and similar tools
+  see the output. A new size (`wlr-randr --output HEADLESS-1
+  --custom-mode 1280x720`, or `--mode`) resizes the framebuffer like
+  `xrandr` does in Xvnc. All viewers are told, and the layout becomes a
+  single screen. Disabling the output, or changing its position, scale
+  or transform, is refused.
+* **vncconfig.** There is no VNC X extension, so `Xvnc-wayland` listens
+  on `$XDG_RUNTIME_DIR/<wayland socket>.vncconfig` (`ControlSocket.cxx`).
+  Only the owner can use it: the socket is mode 0700 and the peer uid is
+  checked. When the X display has no VNC extension, `vncconfig` uses
+  this socket instead. `-list`, `-get` (never the password), `-desc`,
+  `-set`/`name=value` (only for `AllowOverride` parameters, and
+  `desktop` renames the server), `-connect [-view-only] host[:port]`
+  and `-disconnect` work as with Xvnc. Without options, for example
+  `vncconfig -nowin` in an xstartup file, it exits at once, because the
+  server already handles the clipboard.
 * **Xwayland** is started when the compositor starts. Disable it with
   `-Xwayland=0`. Its display number is chosen automatically by wlroots,
   and is not necessarily the VNC display number.
+* **X authority** (`XwaylandAuth`, default on). wlroots itself starts
+  Xwayland without access control. `Xvnc-wayland` sets `WLR_XWAYLAND`
+  to its own executable. Started as `Xwayland`, it writes a fresh
+  random `MIT-MAGIC-COOKIE-1` for that display to
+  `$XDG_RUNTIME_DIR/<wayland socket>.Xauthority` (mode 0600, written to
+  a temporary file and renamed). It then execs the real Xwayland
+  (the user's `WLR_XWAYLAND` if one was set, otherwise `Xwayland` from
+  `PATH`) with `-auth`. The session gets `XAUTHORITY`. X clients
+  without the cookie get "Authorization required".
 * **Session start.** Everything after `--` is started once the
   compositor and Xwayland are ready. Its environment has
-  `WAYLAND_DISPLAY`, `DISPLAY` (Xwayland) and `XDG_SESSION_TYPE=wayland`.
-  When the session command exits, the server exits, like `xinit` does in
-  X11 mode. The Wayland socket is `wayland-<display#>` in
+  `WAYLAND_DISPLAY`, `DISPLAY` (Xwayland), `XAUTHORITY` and
+  `XDG_SESSION_TYPE=wayland`. Our internal variables (`WLR_XWAYLAND` and
+  the `TIGERVNC_*` ones) are restored or removed first.
+* **The display persists like Xvnc's.** When the session command exits,
+  the server logs it and keeps running until it is killed, as `Xvnc`
+  does. Viewers can still connect, and clients can still be started on
+  the display. `-ExitWithSession` stops the server when the session
+  ends instead. vncserver passes it, because that matches what happens
+  in X11 mode, where `xinit` ends the X server with the session. The
+  Wayland socket is `wayland-<display#>` in
   `$XDG_RUNTIME_DIR`. If that is unset, a private
   `/tmp/runtime-<uid>` is used. The `WaylandDisplay` parameter overrides
   the socket name.
@@ -165,10 +234,11 @@ Without `--wayland` or `mode=wayland`, nothing changes.
     `Invalid mode '<value>', must be 'x11' or 'wayland'`.
   * There is no per-display mode in `vncserver.users`.
   * vncserver: `session=` then refers to
-    `/usr/share/wayland-sessions/*.desktop`, and the X-only defaults
-    (`auth`, `fp`, `pn`) are not passed on.
-  * vncserver starts `Xvnc --wayland :N <options> -- [dbus-run-session --]
-    /bin/sh -c "exec <Exec>"`.
+    `/usr/share/wayland-sessions/*.desktop`. X-only options from the
+    config (`auth`, `fp`, `pn`, `dpi`, ...) are passed on, and
+    `Xvnc --wayland` ignores them with a warning.
+  * vncserver starts `Xvnc --wayland :N <options> -ExitWithSession --
+    [dbus-run-session --] /bin/sh -c "exec <Exec>"`.
   * vncsession reads the same `mode` key before PAM, with the user's
     file read with the user's privileges. It then opens the PAM session
     with `XDG_SESSION_TYPE=wayland`, so pam_systemd/logind register a
@@ -187,6 +257,8 @@ Without `--wayland` or `mode=wayland`, nothing changes.
 | `unix/xvnc-wayland/protocol/wlr-layer-shell-unstable-v1.xml` | protocol XML (from wlroots 0.19.2, MIT-style licence) for a header wlroots needs |
 | `unix/xvnc-wayland/protocol/wlr-data-control-unstable-v1.xml` | protocol XML (from wlroots 0.19.2) for the nested clipboard bridge's client code |
 | `unix/xvnc-wayland/nested_bridge.{h,c}` | nested compositor detection helper and clipboard bridge |
+| `unix/xvnc-wayland/ControlSocket.{h,cxx}` | vncconfig control socket |
+| `unix/vncconfig/vncconfig.{cxx,man}` | fallback to the control socket in Wayland mode |
 | `CMakeLists.txt`, `unix/CMakeLists.txt` | `ENABLE_WAYLAND_SERVER` (AUTO/ON/OFF), `WLROOTS_PKG` |
 | `config.h.in` | `CMAKE_INSTALL_FULL_SYSCONFDIR` for vncsession |
 | `unix/vncserver/vncserver.in` | `mode=` handling, Wayland session start |
@@ -271,7 +343,10 @@ Run with `contrib/wayland-mode/run-tests.sh`. Results are in
 (`tests/rfbclient.py`, standard library only) talking to the server:
 
 * `test_x11.py`: regression for plain `Xvnc` and `Xvnc --x11`.
-* `test_wayland.py`: the Wayland mode criteria.
+* `test_wayland.py`: the Wayland mode criteria, plus Xauthority,
+  display persistence and `-ExitWithSession`, `-depth 16`, ignored X
+  options, `AvoidShiftNumLock` (checked with `xev`), two-screen window
+  placement, `wlr-randr`, X11 title bars and `vncconfig`.
 * `test_nested.py`: a real nested sway, and labwc: detection,
   fullscreen over VNC, keyboard and pointer into foot inside sway, both
   selections both ways, resize, a two-screen layout mapped to two sway
@@ -285,9 +360,11 @@ Run with `contrib/wayland-mode/run-tests.sh`. Results are in
 
 ## Limitations / known gaps
 
-* Single output of our own: multi-screen `SetDesktopSize` layouts only
-  matter for nested compositor outputs. Ordinary windows and Xwayland see
-  one big screen, so "maximize" covers all monitors.
+* One output of our own. A multi-screen layout from the viewer drives
+  window placement, maximize and fullscreen, and nested compositor
+  outputs, but Wayland clients and Xwayland see one `wl_output` and one
+  X screen covering all monitors. There is no per-monitor `wl_output`
+  and no RandR monitor list in Xwayland.
 * Nested compositors:
   * The clipboard bridge needs `wlr-data-control` in the nested
     compositor. sway, labwc and other wlroots compositors have it. KDE
@@ -301,35 +378,41 @@ Run with `contrib/wayland-mode/run-tests.sh`. Results are in
     something on its output changes. Until then the old picture is shown
     at the old size. The test interacts with foot in labwc after each
     resize, as a user would.
+  * sway with two outputs (`WLR_WL_OUTPUTS=2`) sometimes (about one run
+    in four here) shows our background on its first output after a
+    layout change. The cause is on sway's side: on that output it
+    commits only its 10x16 cursor image as the window's buffer. This is
+    the wlroots wayland backend's hardware cursor path. With
+    `WLR_NO_HARDWARE_CURSORS=1` in sway's environment, 8 of 8 runs were
+    correct. The test leaves this variable unset and stays strict, so
+    this case can fail.
   * Only text MIME types reach the viewer, as for any client. Other
     types are passed between the nested seat and our seat.
   * Under Docker's default 64 MiB `/dev/shm`, several servers with nested
     compositors at once can run out of shm. wlroots then dies with
     SIGBUS while rendering. The test stops each server before starting
     the next one. Normal hosts have a much larger `/dev/shm`.
-* Depth 24 (XRGB8888) only. `-depth` other than 24 is refused.
-* No `vncconfig` equivalent. `QueryConnect` therefore rejects
-  connections, as Xvnc does when no vncconfig is running. Runtime
-  parameter changes through vncconfig are not possible.
-* `AvoidShiftNumLock` is accepted but has no effect.
+* Depths other than 24 cost a conversion of each damaged area. Depth 8
+  is true colour (rgb332), with no colour map.
+* vncconfig:
+  * No `QueryConnect` dialog, so `QueryConnect` still rejects
+    connections, as Xvnc does when no vncconfig is running.
+  * No clipboard window, because the server syncs the clipboard itself.
+* X11 title bars have no text, no resize borders and no minimize
+  button. Resizing X11 windows still needs the application
+  (`_NET_WM_MOVERESIZE`) or a maximize.
+* `wlr-output-management` changes the size only. The refresh rate is
+  accepted and ignored.
 * Software rendering only (pixman). There is no GPU/dmabuf, and clients
   use shm buffers.
-* Xwayland is started without X authority, like sway/labwc. Any local
-  user who can reach its socket can connect. Its display number is
-  automatic.
+* The Xwayland display number is automatic (wlroots picks a free one).
 * X11 apps can only read or write the clipboard while an X11 window has
   keyboard focus. This is the wlroots Xwayland WM policy, which matches
   the normal interactive use.
-* Minimal WM: no server-side decorations, so X11 windows have no title
-  bars, plus no workspaces, no keyboard shortcuts and no
+* Minimal WM: no workspaces, no keyboard shortcuts, no
   screensaver/idle handling. No input methods, tablets, touch or
-  pointer constraints.
-* `wlr-output-management` is not exposed, so `wlr-randr`/`kanshi` cannot
-  see or change the output. Resize goes through the viewer.
-* `vncserver` in Wayland mode ignores X-only config keys with a warning
-  (`auth`, `fp`, `pn`, `nopn`, `listen`, `nolisten`, `dpi`, `ac`,
-  `noreset`, `co`, `xkbdir`). Any other X server option in the config
-  makes `Xvnc --wayland` refuse to start.
+  pointer constraints. For a full desktop, run a nested compositor
+  (sway, labwc) as the session.
 * vncsession looks for the user config at `~/.config/tigervnc/config`, or
   `~/.vnc/config` as a fallback. A custom `XDG_CONFIG_HOME` set only by
   PAM is not seen when the mode is read.

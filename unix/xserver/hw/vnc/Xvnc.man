@@ -365,18 +365,28 @@ Xwayland is started for X11 applications; its display number is chosen
 automatically.
 
 Everything after \fB\-\-\fP is run as the session once the compositor and
-Xwayland are ready, with \fBWAYLAND_DISPLAY\fP, \fBDISPLAY\fP and
-\fBXDG_SESSION_TYPE=wayland\fP set. The server exits when the session
-command exits.
+Xwayland are ready, with \fBWAYLAND_DISPLAY\fP, \fBDISPLAY\fP,
+\fBXAUTHORITY\fP and \fBXDG_SESSION_TYPE=wayland\fP set. Like the X server,
+the display keeps running when the session command exits, until the server
+is killed (see \fB\-ExitWithSession\fP).
 
 The VNC parameters described above, including the security and
 authentication parameters, work the same way in Wayland mode, as do
-\fB\-geometry\fP, \fB\-depth 24\fP and \fB\-inetd\fP. X server options
-are not accepted. The compositor uses a simple stacking window manager:
-new windows are centred, a click focuses and raises a window, and windows can
-be moved and resized with the usual client-side decorations.
-\fBvncconfig\fP and \fBQueryConnect\fP are not available in Wayland mode.
-Run \fBXvnc \-\-wayland \-help\fP for the full list of options.
+\fB\-geometry\fP, \fB\-depth\fP, \fB\-pixelformat\fP and \fB\-inetd\fP.
+X server options that have no meaning for a compositor (such as
+\fB\-auth\fP, \fB\-fp\fP, \fB\-dpi\fP, \fB\-ac\fP or \fB\-noreset\fP) are
+ignored with a warning; other unknown options are errors.
+
+The compositor uses a simple stacking window manager. New windows open
+centred on the screen with the pointer, a click focuses and raises a window,
+and windows can be moved and resized with the usual client-side
+decorations. Maximize and fullscreen fill one screen of the viewer's layout.
+X11 windows get a simple title bar for moving, maximizing and closing them.
+\fBwlr\-randr\fP and similar tools can change the size of the output.
+\fBvncconfig\fP works through a control socket,
+\fI$XDG_RUNTIME_DIR/\fP\fIsocket\fP\fB.vncconfig\fP, but there is no
+\fBQueryConnect\fP dialog. Run \fBXvnc \-\-wayland \-help\fP for the full
+list of options.
 
 The session can also be a complete Wayland compositor of its own, such as
 \fBsway\fP, \fBlabwc\fP or KDE Plasma, running nested with its Wayland
@@ -394,6 +404,19 @@ its \fBwlr\-data\-control\fP protocol.
 \fBAuto\fP (the default) detects nested compositors as described above.
 \fBOn\fP gives every top level window without a parent a whole screen.
 \fBOff\fP treats nested compositors like any other window.
+.TP
+.B \-ExitWithSession
+Stop the server when the session command exits. By default the display keeps
+running, as with the X server. \fBvncserver\fP sets this, since in X11 mode
+the X server ends with the session too.
+.TP
+.B \-XwaylandAuth
+Give Xwayland a private X authority file with a random
+MIT-MAGIC-COOKIE-1 key, \fI$XDG_RUNTIME_DIR/\fP\fIsocket\fP\fB.Xauthority\fP,
+and set \fBXAUTHORITY\fP for the session. Default is on.
+.TP
+.B \-X11TitleBars
+Draw title bars on X11 windows. Default is on.
 
 .SH USAGE WITH INETD
 By configuring the \fBinetd\fP(1) service appropriately, Xvnc can be launched
