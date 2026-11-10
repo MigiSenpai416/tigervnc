@@ -19,7 +19,7 @@ ART=${3:-$PWD/tarball-test-artifacts-$TAG}
 DOCKER=${DOCKER:-sudo docker}
 IMAGE=tigervnc-tarball-test:$TAG
 
-COMMON="python3 xdotool x11-utils x11-apps x11-xserver-utils xterm xclip xauth
+COMMON="python3 xdotool x11-utils x11-apps x11-xserver-utils xterm xclip xauth xinit
   weston openssl libpam-modules libpam-pwquality dbus dbus-x11 sudo procps
   psmisc fonts-dejavu-core xfonts-base libgl1 libgl1-mesa-dri strace less
   ca-certificates"

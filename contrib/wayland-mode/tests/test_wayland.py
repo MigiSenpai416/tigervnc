@@ -666,6 +666,7 @@ def xev_keys(num, extra):
     try:
         wait_tcp(5900 + num, timeout=20)
         env = small_app_env(envf)
+        keymap = keypad_shift_cancels_numlock(env, num)
         xev = subprocess.Popen(["stdbuf", "-oL", "xev", "-event", "keyboard", "-geometry",
                                 "300x200+0+0"], env=env,
                                stdout=open(xev_log, "w"),
@@ -698,24 +699,53 @@ def xev_keys(num, extra):
     out = open(xev_log).read()
     presses = re.findall(r"KeyPress event.*?\n.*?\n\s+state 0x[0-9a-f]+, "
                          r"keycode (\d+) \(keysym 0x[0-9a-f]+, (\w+)\)", out)
-    return presses, leds_on
+    return presses, leds_on, keymap
+
+
+def keypad_shift_cancels_numlock(env, num):
+    """Whether the live keymap (dumped from Xwayland with xkbcomp) lets
+    Shift cancel NumLock on the keypad (type KEYPAD maps Shift+NumLock).
+    xkeyboard-config >= 2.47 dropped that mapping (Shift no longer
+    reaches KP_Left etc. with NumLock on), and stock Xvnc then falls
+    back to the plain arrow key even with -AvoidShiftNumLock=0."""
+    import re
+    import shutil
+    import subprocess
+    xkbcomp = shutil.which("xkbcomp") or "/usr/libexec/tigervnc/xkbcomp"
+    dump = s.artifact("logs/keymap-%d.xkb" % num)
+    subprocess.run([xkbcomp, "-xkb", env["DISPLAY"], dump], env=env,
+                   capture_output=True, timeout=20)
+    text = open(dump).read() if os.path.exists(dump) else ""
+    m = re.search(r'type "KEYPAD" \{(.*?)\};', text, re.S)
+    if not m:
+        return None
+    return re.search(r"map\[Shift\+NumLock\]", m.group(1)) is not None
 
 
 def t_avoid_shift_numlock():
-    on, leds = xev_keys(7, [])
-    off, _ = xev_keys(8, ["-AvoidShiftNumLock=0"])
+    on, leds, _ = xev_keys(7, [])
+    off, _, shift_cancels = xev_keys(8, ["-AvoidShiftNumLock=0"])
     nl = ("77", "Num_Lock")
     want_on = [("13", "4"), nl, ("113", "Left"), nl]
-    want_off = [("13", "4"), nl, ("50", "Shift_L"), ("83", "KP_Left"), nl]
+    if shift_cancels:
+        want_off = [("13", "4"), nl, ("50", "Shift_L"), ("83", "KP_Left"),
+                    nl]
+        why = "fake Shift + keypad key, like Xvnc"
+    else:
+        # xkeyboard-config >= 2.47: no Shift level reaches KP_Left with
+        # NumLock on, so Xvnc (same data) sends the plain arrow key too
+        want_off = want_on
+        why = ("keymap has no Shift+NumLock keypad level (xkeyboard-config "
+               ">= 2.47): plain arrow key, like Xvnc with this data")
     # ledNumLock is bit 1 of the LED state pseudo-encoding
-    ok = on == want_on and off == want_off and leds is not None and \
-        (leds & 2) != 0
+    ok = shift_cancels is not None and on == want_on and \
+        off == want_off and leds is not None and (leds & 2) != 0
     return ok, ("XK_KP_4 (NumLock off), Num_Lock, XK_KP_Left (NumLock "
                 "on), Num_Lock: default -> X11 key presses %r (want %r: "
                 "the arrow key instead of a fake Shift); "
-                "-AvoidShiftNumLock=0 -> %r (want %r: fake Shift + keypad "
-                "key, like Xvnc); LED state after Num_Lock %r" %
-                (on, want_on, off, want_off, leds))
+                "-AvoidShiftNumLock=0 -> %r (want %r: %s); keymap KEYPAD "
+                "Shift+NumLock level: %r; LED state after Num_Lock %r" %
+                (on, want_on, off, want_off, why, shift_cancels, leds))
 
 
 s.run("AvoidShiftNumLock: no fake Shift on keypad keys (xev); keypad "
