@@ -221,6 +221,111 @@ s.run("vncsession without mode keeps X11 (Xvnc + Xsession)", t_x11_default)
 stop_session(state.get("pid2") or 0, ":2")
 
 
+# ------------------------------------------- stock sway session, nested
+def sway_ipc():
+    for pat in ("/run/user/%d/sway-ipc.*.sock" % pw.pw_uid,
+                "/tmp/runtime-%d/sway-ipc.*.sock" % pw.pw_uid):
+        found = glob.glob(pat)
+        if found:
+            return found[0]
+    return None
+
+
+def swaymsg(*args):
+    sock = sway_ipc()
+    if not sock:
+        return None
+    r = subprocess.run(["runuser", "-u", USER, "--", "env",
+                        "SWAYSOCK=" + sock, "swaymsg", "-r"] + list(args),
+                       capture_output=True, timeout=10)
+    return r.stdout.decode()
+
+
+def sway_output_sizes():
+    import json
+    try:
+        return [(o["name"], o["current_mode"]["width"],
+                 o["current_mode"]["height"])
+                for o in json.loads(swaymsg("-t", "get_outputs") or "")
+                if o.get("active")]
+    except (ValueError, KeyError):
+        return None
+
+
+def t_sway_session():
+    set_config("mode=wayland\nsession=sway\nsecuritytypes=VncAuth\n"
+               "geometry=1024x768\nlocalhost\n")
+    rc, pid, out = start_session(":6")
+    state["pid6"] = pid
+    up = wait_tcp(5906, timeout=20)
+    end = time.time() + 20
+    outs = None
+    while time.time() < end:
+        outs = sway_output_sizes()
+        if outs:
+            break
+        time.sleep(0.5)
+    log = os.path.join(HOME, ".local/state/tigervnc/%s:6.log" % HOST)
+    text = open(log).read() if os.path.exists(log) else ""
+    with open(s.artifact("logs/vncsession-sway-user.log"), "w") as f:
+        f.write(text)
+    nested = [l.strip() for l in text.splitlines()
+              if "nested compositor" in l]
+    c = RFBClient(port=5906, security="VncAuth", password=PASSWORD)
+    time.sleep(2)
+    c.refresh()
+    shot = c.screenshot(s.artifact("vncsession-03-sway-session.png"))
+    c.close()
+    ok = (rc == 0 and up and outs == [("WL-1", 1024, 768)] and
+          "Starting Wayland desktop session sway" in text and bool(nested))
+    return ok, ("stock sway.desktop via vncsession: rc=%d, sway outputs "
+                "%r, server log %r (log copied to "
+                "logs/vncsession-sway-user.log)" % (rc, outs, nested)), \
+        [shot]
+
+
+def t_sway_session_input():
+    # sway's default config: Super+Return opens its terminal (foot)
+    keyfile = os.path.join(HOME, "sway-key.txt")
+    c = RFBClient(port=5906, security="VncAuth", password=PASSWORD)
+    c.refresh()
+    c.pointer(500, 400, 0)
+    c.key(0xffeb, True)
+    c.tap(0xff0d)
+    c.key(0xffeb, False)
+    end = time.time() + 15
+    while time.time() < end and "foot" not in (swaymsg("-t", "get_tree")
+                                               or ""):
+        time.sleep(0.5)
+    time.sleep(1)
+    c.type_text("echo \"sway-session-$((6*7))-${SWAYSOCK:+sway}\" > %s\n"
+                % keyfile)
+    ok = wait_file(keyfile, 5)
+    content = open(keyfile).read().strip() if ok else ""
+    c.refresh()
+    shot = c.screenshot(s.artifact("vncsession-04-sway-terminal.png"))
+    c.set_desktop_size(1280, 800)
+    end = time.time() + 10
+    outs = None
+    while time.time() < end:
+        outs = sway_output_sizes()
+        if outs == [("WL-1", 1280, 800)]:
+            break
+        time.sleep(0.5)
+    c.close()
+    ok = content == "sway-session-42-sway" and outs == [("WL-1", 1280, 800)]
+    return ok, ("Super+Return + typed command in sway's terminal: %r; "
+                "after resize to 1280x800 sway outputs %r"
+                % (content, outs)), [shot]
+
+
+s.run("vncsession starts the stock sway session (sway.desktop) as a "
+      "nested compositor", t_sway_session)
+s.run("stock sway session: Super+Return opens foot, typed command runs "
+      "inside sway, resize follows", t_sway_session_input)
+stop_session(state.get("pid6") or 0, ":6")
+
+
 def t_explicit_x11():
     set_config("mode=x11\nsession=vnc-test-x11\nsecuritytypes=VncAuth\n"
                "geometry=1024x768\nlocalhost\n")
