@@ -441,13 +441,18 @@ class RFBClient:
             finally:
                 self.sock.settimeout(self.timeout)
 
-    def refresh(self, settle=0.5, full=True):
+    def refresh(self, settle=0.5, full=True, max_time=None):
         """Get an up to date framebuffer: full update, then keep
         asking for incremental updates until nothing changes for
-        `settle` seconds."""
+        `settle` seconds. With `max_time`, stop asking after that many
+        seconds even if the screen keeps changing (e.g. a countdown
+        label that redraws every second)."""
+        start = time.time()
         self.request_update(incremental=not full)
         self._wait_for("update", self.timeout)
         while True:
+            if max_time is not None and time.time() - start >= max_time:
+                return
             self.request_update(incremental=True)
             seen = self.pump(settle)
             if "update" not in seen:

@@ -1264,9 +1264,20 @@ def t_query_connect():
             if d is None:
                 return None
             time.sleep(1)
-            c.refresh()
+            # The prompt's countdown label redraws every second, so the
+            # screen never settles while it is open: bound the refresh
+            # (QueryConnectTimeout is only 4 seconds here)
+            c.refresh(max_time=1.0)
             if shot:
                 shots.append(c.screenshot(s.artifact(shot)))
+            # the prompt (TX default background 0xbbbbbb) must be what the
+            # observer sees at the position the X server reports
+            grey = sum(1 for yy in range(d[1], d[1] + d[3])
+                       for xx in range(d[0], d[0] + d[2])
+                       if c.pixel(xx, yy) == (0xbb, 0xbb, 0xbb))
+            check(grey * 2 > d[2] * d[3],
+                  "%s prompt visible to the observer (%d of %d pixels)" %
+                  (button, grey, d[2] * d[3]))
             if button == "Accept":
                 c.click(d[0] + 34, d[1] + d[3] - 14)
             else:
