@@ -32,9 +32,28 @@ foreach(proto ${WVNC_PROTOCOLS})
   list(APPEND WVNC_PROTOCOL_HEADERS ${header})
 endforeach()
 
+# The clipboard bridge to a nested compositor is a data-control client
+set(DATA_CONTROL_XML
+  ${CMAKE_CURRENT_SOURCE_DIR}/protocol/wlr-data-control-unstable-v1.xml)
+set(DATA_CONTROL_HEADER
+  ${CMAKE_CURRENT_BINARY_DIR}/wlr-data-control-unstable-v1-client-protocol.h)
+set(DATA_CONTROL_CODE
+  ${CMAKE_CURRENT_BINARY_DIR}/wlr-data-control-unstable-v1-protocol.c)
+add_custom_command(OUTPUT ${DATA_CONTROL_HEADER}
+  COMMAND ${WAYLAND_SCANNER} client-header ${DATA_CONTROL_XML}
+          ${DATA_CONTROL_HEADER}
+  DEPENDS ${DATA_CONTROL_XML})
+add_custom_command(OUTPUT ${DATA_CONTROL_CODE}
+  COMMAND ${WAYLAND_SCANNER} private-code ${DATA_CONTROL_XML}
+          ${DATA_CONTROL_CODE}
+  DEPENDS ${DATA_CONTROL_XML})
+
 add_executable(Xvnc-wayland
   ${WVNC_PROTOCOL_HEADERS}
+  ${DATA_CONTROL_HEADER}
+  ${DATA_CONTROL_CODE}
   compositor.c
+  nested_bridge.c
   WaylandServerDesktop.cxx
   parameters.cxx
   xvnc-wayland.cxx
@@ -65,6 +84,7 @@ target_link_libraries(Xvnc-wayland PRIVATE rfbserver rfb network rdr core)
 target_link_libraries(Xvnc-wayland PRIVATE
   PkgConfig::WLROOTS
   PkgConfig::WAYLANDSERVER
+  PkgConfig::WVNC_WAYLANDCLIENT
   PkgConfig::WVNC_XKBCOMMON
   PkgConfig::WVNC_PIXMAN
   PkgConfig::WVNC_LIBDRM)

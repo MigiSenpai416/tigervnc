@@ -24,6 +24,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <vector>
+
 #include <core/LogWriter.h>
 #include <core/Region.h>
 #include <core/string.h>
@@ -45,7 +47,8 @@ static const rfb::PixelFormat fbFormat(32, 24, false, true,
 
 WaylandServerDesktop::WaylandServerDesktop(int width, int height,
                                            const char* socketName,
-                                           bool xwayland)
+                                           bool xwayland,
+                                           int nestedMode)
   : comp(nullptr), server(nullptr), pb(nullptr), xReady(false)
 {
   struct wvnc_options opts;
@@ -56,6 +59,7 @@ WaylandServerDesktop::WaylandServerDesktop(int width, int height,
   opts.height = height;
   opts.socket_name = socketName;
   opts.xwayland = xwayland;
+  opts.nested_mode = (enum wvnc_nested_mode)nestedMode;
 
   memset(&cb, 0, sizeof(cb));
   cb.data = this;
@@ -111,6 +115,17 @@ void WaylandServerDesktop::init(rfb::VNCServer* vs)
   server = vs;
   // The display is always there, so the server can always be ready
   server->setPixelBuffer(pb);
+  // The default layout is a single screen covering the framebuffer
+  wvnc_set_screens(comp, nullptr, 0);
+}
+
+void WaylandServerDesktop::setScreens(const rfb::ScreenSet& layout)
+{
+  std::vector<struct wvnc_box> boxes;
+  for (const rfb::Screen& s : layout)
+    boxes.push_back({s.dimensions.tl.x, s.dimensions.tl.y,
+                     s.dimensions.width(), s.dimensions.height()});
+  wvnc_set_screens(comp, boxes.data(), boxes.size());
 }
 
 void WaylandServerDesktop::queryConnection(rfb::SConnection* conn)
@@ -138,12 +153,14 @@ unsigned int WaylandServerDesktop::setScreenLayout(int fb_width,
   if (!wvnc_resize(comp, fb_width, fb_height))
     return rfb::resultInvalid;
 
-  // The virtual output covers the entire framebuffer; additional
-  // screens in the layout are passed through as metadata only.
+  // The virtual output covers the entire framebuffer. The screen
+  // rectangles are used to give a nested compositor one output per
+  // screen; ordinary windows only see the whole framebuffer.
   oldpb = pb;
   pb = createPixelBuffer();
   server->setPixelBuffer(pb, layout);
   delete oldpb;
+  setScreens(layout);
 
   vlog.info(_("Framebuffer resized to %dx%d"), fb_width, fb_height);
 

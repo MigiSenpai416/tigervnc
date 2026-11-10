@@ -92,6 +92,7 @@
 #endif
 
 #include "compositor.h"
+#include "nested_bridge.h"
 
 extern const unsigned short code_map_qnum_to_xorgevdev[];
 extern const unsigned int code_map_qnum_to_xorgevdev_len;
@@ -109,6 +110,7 @@ extern const unsigned int code_map_qnum_to_xorgevdev_len;
 #define WVNC_BTN_EXTRA  0x114
 
 #define MAX_PRESSED_KEYS 64
+#define MAX_SCREENS 16
 #define MAX_SELECTION_SIZE (16 * 1024 * 1024)
 
 enum owner_type {
@@ -254,6 +256,13 @@ struct wvnc_compositor {
   struct wl_listener xwayland_ready;
   struct wl_listener xwayland_new_surface;
 #endif
+
+  /* Nested compositor support */
+  enum wvnc_nested_mode nested_mode;
+  struct wlr_box screens[MAX_SCREENS];
+  int num_screens; /* 0: one screen covering the framebuffer */
+  unsigned int view_seq;
+  struct nested_bridge* bridge;
 };
 
 struct view {
@@ -264,6 +273,12 @@ struct view {
   bool mapped;
   bool maximized, fullscreen;
   struct wlr_box saved; /* geometry before maximize/fullscreen */
+  /* An output window of a nested compositor: it gets a whole screen,
+   * stays at the bottom and can't be moved or resized */
+  bool nested;
+  bool nested_checked;
+  unsigned int seq;
+  struct wlr_box nested_box;
 
   /* xdg */
   struct wlr_xdg_toplevel* xdg;
@@ -560,8 +575,12 @@ static void focus_view(struct view* v)
   struct wvnc_compositor* c = v->c;
   struct view* prev = focused_view(c);
 
-  if (v->scene_tree)
-    wlr_scene_node_raise_to_top(&v->scene_tree->node);
+  if (v->scene_tree) {
+    if (v->nested)
+      wlr_scene_node_lower_to_bottom(&v->scene_tree->node);
+    else
+      wlr_scene_node_raise_to_top(&v->scene_tree->node);
+  }
   wl_list_remove(&v->link);
   wl_list_insert(&c->views, &v->link);
 #ifdef HAVE_XWAYLAND
@@ -651,11 +670,171 @@ static void view_maximize(struct view* v, bool maximize, bool fullscreen)
     wlr_xdg_toplevel_set_size(v->xdg, 0, 0);
 }
 
+/* Nested compositors ------------------------------------------------ */
+
+/*
+ * A session can itself be a full Wayland compositor (sway, labwc, KDE,
+ * ...) using its wayland backend, i.e. showing its outputs as top level
+ * windows on our display. Such windows get a whole screen each, are
+ * fullscreen (so undecorated), stay at the bottom so that ordinary
+ * windows of ours remain reachable, and follow the VNC client's
+ * framebuffer size and screen layout. A clipboard bridge connects the
+ * nested compositor's seat with ours.
+ */
+
+static pid_t view_client_pid(struct view* v)
+{
+  pid_t pid = 0;
+  if (v->owner.type != OWNER_XDG)
+    return 0;
+  wl_client_get_credentials(wl_resource_get_client(v->xdg->resource),
+                            &pid, NULL, NULL);
+  return pid;
+}
+
+static void nested_start_bridge(struct wvnc_compositor* c, pid_t pid,
+                                const char* path)
+{
+  if (c->bridge && nested_bridge_pid(c->bridge) == pid &&
+      nested_bridge_active(c->bridge))
+    return;
+  nested_bridge_destroy(c->bridge);
+  c->bridge = nested_bridge_create(c->display, c->seat, path, pid);
+  if (!c->bridge)
+    wlr_log(WLR_ERROR, "Unable to connect the clipboard bridge to %s",
+            path);
+}
+
+/* Decides whether a new top level window is a nested compositor
+ * output. Returns true if it is. */
+static bool nested_detect(struct view* v)
+{
+  struct wvnc_compositor* c = v->c;
+  pid_t pid;
+  char* path;
+
+  if (v->owner.type != OWNER_XDG || v->xdg->parent)
+    return false;
+  if (c->nested_mode == WVNC_NESTED_OFF)
+    return false;
+
+  pid = view_client_pid(v);
+
+  if (c->bridge && pid > 0 && nested_bridge_pid(c->bridge) == pid &&
+      nested_bridge_active(c->bridge))
+    return true;
+
+  /* A client that serves its own Wayland socket is a compositor */
+  path = pid > 0 ? nested_find_socket(getenv("XDG_RUNTIME_DIR"),
+                                      c->socket, pid) : NULL;
+  if (path) {
+    wlr_log(WLR_INFO, "Client pid %d (%s) is a nested compositor serving "
+            "%s", (int)pid, v->xdg->app_id ? v->xdg->app_id : "?", path);
+    nested_start_bridge(c, pid, path);
+    free(path);
+    return true;
+  }
+
+  if (c->nested_mode == WVNC_NESTED_ON) {
+    wlr_log(WLR_INFO, "NestedCompositor=On: treating window of pid %d as "
+            "a nested compositor output (no clipboard bridge, its socket "
+            "wasn't found)", (int)pid);
+    return true;
+  }
+  return false;
+}
+
+static void nested_position(struct view* v)
+{
+  struct wlr_box* geo = &v->xdg->base->geometry;
+  wlr_scene_node_set_position(&v->scene_tree->node,
+                              v->nested_box.x - geo->x,
+                              v->nested_box.y - geo->y);
+}
+
+static void arrange_nested(struct wvnc_compositor* c)
+{
+  struct view* list[64];
+  struct wlr_box full = { 0, 0, c->width, c->height };
+  struct view* v;
+  int n = 0;
+
+  wl_list_for_each(v, &c->views, link) {
+    if (!v->nested || !v->xdg->base->initialized)
+      continue;
+    if (n < (int)(sizeof(list) / sizeof(list[0])))
+      list[n++] = v;
+  }
+
+  /* Oldest first, so outputs keep their screen across focus changes */
+  for (int i = 1; i < n; i++)
+    for (int j = i; j > 0 && list[j - 1]->seq > list[j]->seq; j--) {
+      struct view* t = list[j];
+      list[j] = list[j - 1];
+      list[j - 1] = t;
+    }
+
+  for (int i = 0; i < n; i++) {
+    struct wlr_box box = full;
+    v = list[i];
+    /* One output per screen when there are several of both; a single
+     * output always covers the whole framebuffer */
+    if (c->num_screens >= 2 && n >= 2 && i < c->num_screens)
+      box = c->screens[i];
+    v->nested_box = box;
+    v->maximized = false;
+    v->fullscreen = true;
+    wlr_xdg_toplevel_set_maximized(v->xdg, false);
+    wlr_xdg_toplevel_set_fullscreen(v->xdg, true);
+    wlr_xdg_toplevel_set_size(v->xdg, box.width, box.height);
+    nested_position(v);
+  }
+}
+
+static void nested_view_gone(struct view* v)
+{
+  struct wvnc_compositor* c = v->c;
+  struct view* o;
+  pid_t pid;
+
+  if (!v->nested || !c->bridge)
+    return;
+  pid = nested_bridge_pid(c->bridge);
+  wl_list_for_each(o, &c->views, link) {
+    if (o != v && o->nested && view_client_pid(o) == pid)
+      return;
+  }
+  nested_bridge_destroy(c->bridge);
+  c->bridge = NULL;
+}
+
+void wvnc_set_screens(struct wvnc_compositor* c, const struct wvnc_box* boxes,
+                      int n)
+{
+  c->num_screens = 0;
+  for (int i = 0; i < n && c->num_screens < MAX_SCREENS; i++) {
+    struct wlr_box b = { boxes[i].x, boxes[i].y,
+                         boxes[i].width, boxes[i].height };
+    /* Clip to the framebuffer */
+    if (b.x < 0) { b.width += b.x; b.x = 0; }
+    if (b.y < 0) { b.height += b.y; b.y = 0; }
+    if (b.x + b.width > c->width) b.width = c->width - b.x;
+    if (b.y + b.height > c->height) b.height = c->height - b.y;
+    if (b.width <= 0 || b.height <= 0)
+      continue;
+    c->screens[c->num_screens++] = b;
+  }
+  if (c->num_screens == 1 && c->screens[0].x == 0 && c->screens[0].y == 0 &&
+      c->screens[0].width == c->width && c->screens[0].height == c->height)
+    c->num_screens = 0;
+  arrange_nested(c);
+}
+
 static void rearrange_views(struct wvnc_compositor* c)
 {
   struct view* v;
   wl_list_for_each(v, &c->views, link) {
-    if (!v->mapped)
+    if (!v->mapped || v->nested)
       continue;
     if (v->fullscreen || v->maximized) {
       view_maximize(v, v->maximized, v->fullscreen);
@@ -687,6 +866,7 @@ static void rearrange_views(struct wvnc_compositor* c)
 #endif
     }
   }
+  arrange_nested(c);
 }
 
 /* xdg-shell ---------------------------------------------------------- */
@@ -696,7 +876,17 @@ static void xdg_map(struct wl_listener* listener, void* data)
   struct view* v = wl_container_of(listener, v, map);
   (void)data;
   v->mapped = true;
-  if (!v->maximized && !v->fullscreen)
+  if (!v->nested && !v->nested_checked) {
+    /* The socket may not have existed at the initial commit */
+    v->nested_checked = true;
+    if (nested_detect(v)) {
+      v->nested = true;
+      arrange_nested(v->c);
+    }
+  }
+  if (v->nested)
+    nested_position(v);
+  else if (!v->maximized && !v->fullscreen)
     view_place(v);
   focus_view(v);
 }
@@ -714,6 +904,8 @@ static void xdg_unmap(struct wl_listener* listener, void* data)
   }
   if (had_focus)
     focus_next_view(c);
+  if (v->nested)
+    arrange_nested(c);
 }
 
 static void xdg_commit(struct wl_listener* listener, void* data)
@@ -721,8 +913,21 @@ static void xdg_commit(struct wl_listener* listener, void* data)
   struct view* v = wl_container_of(listener, v, commit);
   struct wvnc_compositor* c = v->c;
   (void)data;
-  if (!v->xdg->base->initial_commit)
+  if (!v->xdg->base->initial_commit) {
+    /* The window geometry offset may change with any commit */
+    if (v->nested)
+      nested_position(v);
     return;
+  }
+
+  if (!v->nested && nested_detect(v))
+    v->nested = true;
+  if (v->nested) {
+    wlr_xdg_toplevel_set_wm_capabilities(v->xdg,
+      WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN);
+    arrange_nested(c);
+    return;
+  }
 
   wlr_xdg_toplevel_set_wm_capabilities(v->xdg,
     WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE |
@@ -748,7 +953,10 @@ static void xdg_commit(struct wl_listener* listener, void* data)
 static void xdg_destroy(struct wl_listener* listener, void* data)
 {
   struct view* v = wl_container_of(listener, v, destroy);
+  struct wvnc_compositor* c = v->c;
+  bool nested = v->nested;
   (void)data;
+  nested_view_gone(v);
   wl_list_remove(&v->map.link);
   wl_list_remove(&v->unmap.link);
   wl_list_remove(&v->commit.link);
@@ -759,6 +967,8 @@ static void xdg_destroy(struct wl_listener* listener, void* data)
   wl_list_remove(&v->request_fullscreen.link);
   wl_list_remove(&v->link);
   free(v);
+  if (nested)
+    arrange_nested(c);
 }
 
 static void begin_grab(struct view* v, enum grab_mode mode, uint32_t edges)
@@ -766,7 +976,7 @@ static void begin_grab(struct view* v, enum grab_mode mode, uint32_t edges)
   struct wvnc_compositor* c = v->c;
   struct wlr_box box;
 
-  if (v->maximized || v->fullscreen)
+  if (v->maximized || v->fullscreen || v->nested)
     return;
   if ((c->button_mask & 0x7) == 0)
     return; /* Only allowed while a button is held */
@@ -801,7 +1011,9 @@ static void xdg_request_maximize(struct wl_listener* listener, void* data)
   (void)data;
   if (!v->xdg->base->initialized)
     return;
-  if (v->mapped)
+  if (v->nested)
+    arrange_nested(v->c); /* always a whole screen */
+  else if (v->mapped)
     view_maximize(v, v->xdg->requested.maximized, v->fullscreen);
   wlr_xdg_surface_schedule_configure(v->xdg->base);
 }
@@ -812,7 +1024,9 @@ static void xdg_request_fullscreen(struct wl_listener* listener, void* data)
   (void)data;
   if (!v->xdg->base->initialized)
     return;
-  if (v->mapped)
+  if (v->nested)
+    arrange_nested(v->c);
+  else if (v->mapped)
     view_maximize(v, v->maximized, v->xdg->requested.fullscreen);
   wlr_xdg_surface_schedule_configure(v->xdg->base);
 }
@@ -826,6 +1040,7 @@ static void handle_new_xdg_toplevel(struct wl_listener* listener, void* data)
   v->owner.type = OWNER_XDG;
   v->c = c;
   v->xdg = xdg;
+  v->seq = ++c->view_seq;
   v->scene_tree = wlr_scene_xdg_surface_create(c->views_tree, xdg->base);
   v->scene_tree->node.data = &v->owner;
   xdg->base->data = v->scene_tree;
@@ -2253,6 +2468,7 @@ static void handle_set_selection(struct wl_listener* listener, void* data)
 {
   struct wvnc_compositor* c = wl_container_of(listener, c, set_selection);
   (void)data;
+  nested_bridge_host_selection(c->bridge);
   if (is_vnc_source(c->seat, WVNC_SELECTION_CLIPBOARD))
     return;
   c->last_announced = WVNC_SELECTION_CLIPBOARD;
@@ -2267,6 +2483,7 @@ static void handle_set_primary_selection(struct wl_listener* listener,
   struct wvnc_compositor* c =
     wl_container_of(listener, c, set_primary_selection);
   (void)data;
+  nested_bridge_host_primary(c->bridge);
   if (is_vnc_source(c->seat, WVNC_SELECTION_PRIMARY))
     return;
   /* Losing PRIMARY doesn't clear the VNC clipboard (same as Xvnc) */
@@ -2323,6 +2540,7 @@ struct wvnc_compositor* wvnc_compositor_create(const struct wvnc_options* opts,
   c->cb = *cb;
   c->width = opts->width;
   c->height = opts->height;
+  c->nested_mode = opts->nested_mode;
   c->usable_area = (struct wlr_box){ 0, 0, c->width, c->height };
   wl_list_init(&c->views);
   wl_list_init(&c->layers);
@@ -2506,6 +2724,8 @@ void wvnc_compositor_destroy(struct wvnc_compositor* c)
       pending_write_free(w);
     }
     drop_pending_fds(c);
+    nested_bridge_destroy(c->bridge);
+    c->bridge = NULL;
     wl_display_destroy_clients(c->display);
 
     /* wlroots asserts that nobody listens any more when its objects

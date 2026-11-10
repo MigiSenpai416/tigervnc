@@ -8,7 +8,7 @@ ARG https_proxy
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       xclip x11-utils wlr-randr wayland-utils openssl python3-pil \
-      libpam-pwquality && \
+      libpam-pwquality sway labwc && \
     rm -rf /var/lib/apt/lists/* && \
     rm -f /etc/apt/apt.conf.d/80proxy
 

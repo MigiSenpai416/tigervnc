@@ -374,8 +374,13 @@ int main(int argc, char** argv)
   int ret = 0;
 
   try {
+    int nestedMode = WVNC_NESTED_AUTO;
+    if (nestedCompositor == "On")
+      nestedMode = WVNC_NESTED_ON;
+    else if (nestedCompositor == "Off")
+      nestedMode = WVNC_NESTED_OFF;
     WaylandServerDesktop desktop(width, height, socketName.c_str(),
-                                 xwaylandEnabled);
+                                 xwaylandEnabled, nestedMode);
     if (!desktop.valid()) {
       vlog.error(_("Unable to create the Wayland display"));
       return 1;

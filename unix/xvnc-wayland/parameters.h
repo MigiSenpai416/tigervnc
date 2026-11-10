@@ -37,5 +37,6 @@ extern core::BoolParameter rawKeyboard;
 // Wayland mode only
 extern core::StringParameter waylandDisplay;
 extern core::BoolParameter xwaylandEnabled;
+extern core::EnumParameter nestedCompositor;
 
 #endif

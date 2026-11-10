@@ -34,7 +34,7 @@ namespace rfb { class VNCServer; }
 class WaylandServerDesktop : public rfb::SDesktop {
 public:
   WaylandServerDesktop(int width, int height, const char* socketName,
-                       bool xwayland);
+                       bool xwayland, int nestedMode);
   virtual ~WaylandServerDesktop();
 
   bool valid() const { return comp != nullptr; }
@@ -70,6 +70,7 @@ private:
   static void cbXwaylandReady(void* data, const char* display);
 
   rfb::PixelBuffer* createPixelBuffer();
+  void setScreens(const rfb::ScreenSet& layout);
 
   struct wvnc_compositor* comp;
   rfb::VNCServer* server;

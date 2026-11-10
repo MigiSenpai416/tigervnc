@@ -89,6 +89,13 @@ core::BoolParameter
                   _("Start Xwayland so that X11 applications can run "
                     "on the Wayland display"),
                   true);
+core::EnumParameter
+  nestedCompositor("NestedCompositor",
+                   _("How to treat a session that is itself a Wayland "
+                     "compositor (sway, labwc, KDE, ...): Auto detects "
+                     "it, On treats every top level window as one, Off "
+                     "always manages windows as normal applications"),
+                   {"Auto", "On", "Off"}, "Auto");
 
 static const char* defaultDesktopName()
 {

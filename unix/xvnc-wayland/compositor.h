@@ -60,12 +60,25 @@ struct wvnc_callbacks {
   void (*xwayland_ready)(void* data, const char* display);
 };
 
+enum wvnc_nested_mode {
+  WVNC_NESTED_AUTO = 0,
+  WVNC_NESTED_ON,
+  WVNC_NESTED_OFF,
+};
+
+struct wvnc_box {
+  int x, y, width, height;
+};
+
 struct wvnc_options {
   int width;
   int height;
   /* Wayland socket name, e.g. "wayland-1"; NULL picks a free one */
   const char* socket_name;
   bool xwayland;
+  /* Whether top level windows of a nested compositor get whole
+   * screens instead of being managed as normal windows */
+  enum wvnc_nested_mode nested_mode;
 };
 
 struct wvnc_compositor* wvnc_compositor_create(const struct wvnc_options* opts,
@@ -73,6 +86,12 @@ struct wvnc_compositor* wvnc_compositor_create(const struct wvnc_options* opts,
 void wvnc_compositor_destroy(struct wvnc_compositor* c);
 
 const char* wvnc_socket_name(struct wvnc_compositor* c);
+
+/* The client's screen layout, used to give a nested compositor one
+ * output per screen. n == 0 means a single screen covering the
+ * framebuffer. Call after wvnc_resize(). */
+void wvnc_set_screens(struct wvnc_compositor* c, const struct wvnc_box* boxes,
+                      int n);
 
 /* Event loop integration */
 int wvnc_event_fd(struct wvnc_compositor* c);
