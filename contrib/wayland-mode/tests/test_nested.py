@@ -38,9 +38,10 @@ exec foot --app-id nested-foot bash --norc --noprofile
 """
 
 
-def start(display, outputs, geometry="1024x768"):
-    """Starts Xvnc --wayland with sway as the session. Returns
-    (server process, environment for nested clients, runtime dir)."""
+def start(display, outputs, geometry="1024x768", extra=(), session=None):
+    """Starts Xvnc --wayland with sway (or `session`) as the session.
+    Returns (server process, environment for nested clients, runtime
+    dir)."""
     runtime = os.path.join(WORK, "rt-%d" % display)
     os.makedirs(runtime, mode=0o700, exist_ok=True)
     cfg = os.path.join(WORK, "sway.cfg")
@@ -49,32 +50,45 @@ def start(display, outputs, geometry="1024x768"):
     sess = os.path.join(WORK, "session-%d.sh" % display)
     with open(sess, "w") as f:
         f.write("#!/bin/sh\nexport WLR_RENDERER=pixman WLR_WL_OUTPUTS=%d\n"
-                "exec sway -c %s > %s/sway-%d.log 2>&1\n"
-                % (outputs, cfg, s.logdir, display))
+                "exec %s > %s/session-%d.log 2>&1\n"
+                % (outputs, session or "sway -c " + cfg, s.logdir,
+                   display))
     os.chmod(sess, 0o755)
     env = {k: v for k, v in os.environ.items()
            if k not in ("DISPLAY", "WAYLAND_DISPLAY", "XDG_SESSION_TYPE",
                         "SWAYSOCK")}
     env["XDG_RUNTIME_DIR"] = runtime
     cmd = ["Xvnc", "--wayland", ":%d" % display, "-geometry", geometry,
-           "-rfbauth", passwd, "-SecurityTypes", "VncAuth", "-localhost",
-           "--", sess]
+           "-rfbauth", passwd, "-SecurityTypes", "VncAuth", "-localhost"] + \
+        list(extra) + ["--", sess]
     server = s.spawn("nested-server-%d" % display, cmd, env=env)
     return server, env, runtime
 
 
-def nested_env(env, runtime, own):
-    """Environment that talks to sway (the nested compositor)."""
+def stop(server):
+    """Stops a server and its session before starting the next one, so
+    that the servers don't compete for /dev/shm (64 MiB in Docker)."""
+    import signal
+    try:
+        os.killpg(server.pid, signal.SIGTERM)
+        server.wait(10)
+    except (OSError, Exception):
+        pass
+
+
+def nested_env(env, runtime, own, sway=True):
+    """Environment that talks to the nested compositor."""
     end = time.time() + 20
     while time.time() < end:
         socks = [p for p in glob.glob(runtime + "/wayland-*")
                  if not p.endswith(".lock") and
                  os.path.basename(p) != own]
         ipc = glob.glob(runtime + "/sway-ipc.*.sock")
-        if socks and ipc:
+        if socks and (ipc or not sway):
             e = dict(env)
             e["WAYLAND_DISPLAY"] = os.path.basename(socks[0])
-            e["SWAYSOCK"] = ipc[0]
+            if ipc:
+                e["SWAYSOCK"] = ipc[0]
             return e
         time.sleep(0.5)
     return None
@@ -299,6 +313,7 @@ def t_resize():
 s.run("client resize: nested output follows (1024x768 -> 1280x720)",
       t_resize)
 vnc.close()
+stop(server)
 
 # --------------------------------------------------- 2 outputs, 2 screens
 
@@ -342,10 +357,16 @@ def t_multi():
     # the other only sway's background. Our output windows go to the
     # screens in creation order, so WL-1 is the left one.
     foot_out = foot_output(nenv2)
-    fl, bl = (fraction(v, FOOT_BG, 0, 0, 800, 600),
-              fraction(v, BG, 0, 0, 800, 600))
-    fr, br = (fraction(v, FOOT_BG, 800, 0, 1600, 600),
-              fraction(v, BG, 800, 0, 1600, 600))
+    end = time.time() + 10
+    while True:
+        fl, bl = (fraction(v, FOOT_BG, 0, 0, 800, 600),
+                  fraction(v, BG, 0, 0, 800, 600))
+        fr, br = (fraction(v, FOOT_BG, 800, 0, 1600, 600),
+                  fraction(v, BG, 800, 0, 1600, 600))
+        if (min(fl, br) > 0.9 or min(bl, fr) > 0.9) or time.time() > end:
+            break
+        time.sleep(1)
+        v.refresh()
     shot = v.screenshot(s.artifact("nested-05-two-screens.png"))
     v.close()
     if foot_out == "WL-1":
@@ -362,5 +383,110 @@ def t_multi():
 
 s.run("multi-monitor: two-screen client layout -> two nested outputs "
       "(sway WLR_WL_OUTPUTS=2)", t_multi)
+stop(server2)
+
+# ----------------------------------------------------------------- labwc
+
+HOST_BG = (46, 51, 63)    # Xvnc-wayland's own background
+
+
+def wlr_randr_size(env):
+    import re
+    rc, out = sh(["wlr-randr"], env=env)
+    m = re.search(r"(\d+)x(\d+) px[^\n]*current", out)
+    return (int(m.group(1)), int(m.group(2))) if m else out.strip()[-200:]
+
+
+# labwc applies a new output size but only repaints once something on
+# the output changes, so the test runs foot in it and types into it
+# after each size change, as a user would interact with the desktop
+server3, env3, runtime3 = start(3, 1, session="labwc -s foot")
+
+
+def poke(v):
+    v.tap(ord("x"))
+    time.sleep(1)
+    v.refresh()
+PORT3 = 5903
+
+
+def t_labwc():
+    if not wait_tcp(PORT3, timeout=20):
+        return False, "server not listening (exit=%s)" % server3.poll()
+    nenv3 = nested_env(env3, runtime3, "wayland-3", sway=False)
+    if not nenv3:
+        return False, "labwc did not create its socket"
+    end = time.time() + 15
+    while time.time() < end and "nested compositor serving" not in \
+            server_log(3):
+        time.sleep(0.5)
+    v = RFBClient(port=PORT3, security="VncAuth", password=PASSWORD)
+    time.sleep(2)
+    poke(v)
+    host_bg = fraction(v, HOST_BG, 0, 0, v.width, v.height)
+    size1 = wlr_randr_size(nenv3)
+    shot = v.screenshot(s.artifact("nested-06-labwc.png"))
+    v.cut_texts.clear()
+    s.spawn("wl-copy-labwc", ["wl-copy", "--foreground", "from-labwc-77"],
+            env=nenv3)
+    txt = v.wait_cut_text(5)
+    v.cut_text("to-labwc-88")
+    time.sleep(1)
+    rc, back = sh(["wl-paste", "--no-newline"], env=nenv3)
+    v.set_desktop_size(1280, 720)
+    end = time.time() + 10
+    size2 = None
+    while time.time() < end:
+        size2 = wlr_randr_size(nenv3)
+        if size2 == (1280, 720):
+            break
+        time.sleep(0.5)
+    poke(v)
+    host_bg2 = fraction(v, HOST_BG, 0, 0, v.width, v.height)
+    shot2 = v.screenshot(s.artifact("nested-07-labwc-1280x720.png"))
+    v.close()
+    detected = "nested compositor serving" in server_log(3)
+    ok = (detected and size1 == (1024, 768) and host_bg < 0.01 and
+          txt == "from-labwc-77" and back == "to-labwc-88" and
+          size2 == (1280, 720) and host_bg2 < 0.01)
+    return ok, ("detected=%s; labwc output %r, our background visible on "
+                "%.1f%%; clipboard labwc->viewer %r, viewer->labwc %r; "
+                "after resize labwc output %r, our background %.1f%%"
+                % (detected, size1, host_bg * 100, txt, back, size2,
+                   host_bg2 * 100)), [shot, shot2]
+
+
+s.run("labwc session: detected, output fills the screen, clipboard both "
+      "ways, resize follows", t_labwc)
+stop(server3)
+
+# ------------------------------------------------- NestedCompositor=Off
+
+server4, env4, runtime4 = start(4, 1, extra=["-NestedCompositor", "Off"])
+PORT4 = 5904
+
+
+def t_off():
+    if not wait_tcp(PORT4, timeout=20):
+        return False, "server not listening (exit=%s)" % server4.poll()
+    nenv4 = nested_env(env4, runtime4, "wayland-4")
+    time.sleep(4)
+    v = RFBClient(port=PORT4, security="VncAuth", password=PASSWORD)
+    v.refresh()
+    host_bg = fraction(v, HOST_BG, 0, 0, v.width, v.height)
+    shot = v.screenshot(s.artifact("nested-08-nestedcompositor-off.png"))
+    v.close()
+    outs = sway_outputs(nenv4) if nenv4 else None
+    detected = "nested compositor serving" in server_log(4)
+    # sway is then an ordinary (floating) window: its size is its own
+    # choice and our background shows around it
+    ok = not detected and isinstance(outs, list) and len(outs) == 1 and \
+        outs[0][3:] != (1024, 768) and host_bg > 0.05
+    return ok, ("detected=%s; sway output %r; our background visible on "
+                "%.0f%%" % (detected, outs, host_bg * 100)), [shot]
+
+
+s.run("NestedCompositor=Off: sway is managed as an ordinary window "
+      "(floating WM fallback)", t_off)
 
 sys.exit(s.finish())

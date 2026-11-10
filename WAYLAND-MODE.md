@@ -30,7 +30,10 @@ Without `--wayland` or `mode=wayland`, nothing changes.
         |                       clipboard, SetDesktopSize             |
         | compositor.c       wlroots: headless backend + pixman,      |
         |                    scene graph, xdg-shell, layer-shell,     |
-        |                    Xwayland, seat, selections               |
+        |                    Xwayland, seat, selections, floating WM  |
+        |                    or whole screens for a nested compositor |
+        | nested_bridge.c    wlr-data-control client to a nested      |
+        |                    compositor: clipboard + primary bridge   |
         +-------------------------------------------------------------+
                      shared: common/rfb, rdr, network, core
 ```
@@ -84,6 +87,45 @@ Without `--wayland` or `mode=wayland`, nothing changes.
   * Popups are constrained to the output.
   * layer-shell (panels, backgrounds, launchers) is supported, with an
     exclusive-zone usable area.
+* **Nested full compositors** (sway, labwc, KDE Plasma, ...). The
+  built-in floating WM stays the fallback for ordinary applications. A
+  session that is itself a compositor, running with its wayland backend,
+  shows each of its outputs as an xdg toplevel. Those toplevels are
+  handled differently:
+  * Detection (`NestedCompositor=Auto`, the default): at the toplevel's
+    first commit, or at the latest when it maps, the client's pid is read
+    with `wl_client_get_credentials()`. Each `wayland-*` socket in our
+    `XDG_RUNTIME_DIR`, owned by our uid and not our own, is connected to,
+    and `SO_PEERCRED` is checked. If the client serves one of them, it is
+    a compositor. Only parentless toplevels qualify. `NestedCompositor=On`
+    treats every parentless toplevel as a nested output, and `Off` never
+    does.
+  * Layout: nested outputs are fullscreen (`xdg_toplevel` fullscreen
+    state, so wlroots-based compositors draw no decorations; no
+    xdg-decoration is offered). They are kept at the bottom of the stack,
+    so ordinary windows of ours still show above them. Move and resize
+    requests are ignored, and maximize/fullscreen requests re-assert the
+    layout.
+  * Multi-monitor: the client's `SetDesktopSize` screen layout is passed
+    to the compositor (`wvnc_set_screens()`). With two or more screens
+    and two or more nested outputs, output *i* (in creation order) gets
+    screen *i*, and extra outputs get the whole framebuffer. Otherwise
+    one output covers the whole framebuffer. Resizes re-arrange
+    everything, and the nested compositor sees a new size in the
+    `xdg_toplevel.configure`. For sway, `WLR_WL_OUTPUTS=n` creates *n*
+    outputs. Where the nested compositor places its outputs in its own
+    logical layout is its configuration, not ours.
+  * Input: keyboard focus and pointer events go to the nested output
+    surface like any other window. The nested compositor routes them on.
+  * Clipboard bridge (`nested_bridge.c`): a libwayland-client connection
+    to the nested compositor's socket, driven fully asynchronously from
+    our event loop (no blocking round trips, since the nested compositor
+    is also our client). It uses `zwlr_data_control_manager_v1` (v2 for
+    primary). Nested selections become sources on our seat, so they reach
+    the viewer and our own clients. Our selections, including those from
+    the viewer, are offered to the nested seat with a marker MIME type,
+    so they don't loop back. Data is streamed fd to fd and never
+    buffered. The bridge goes away with the compositor's last output.
 * **Clipboard.**
   * Both the CLIPBOARD and PRIMARY selections are synced with the
     viewer, with the same semantics as Xvnc: `SetPrimary`,
@@ -95,8 +137,10 @@ Without `--wayland` or `mode=wayland`, nothing changes.
   * X11 apps are bridged by the wlroots Xwayland WM.
 * **Client-driven resize.** `SetDesktopSize` changes the output's custom
   mode. Wayland clients see a new `wl_output` mode and Xwayland resizes
-  its screen. All viewers get `ExtendedDesktopSize`. Multi-screen layouts
-  are accepted as metadata only, because there is a single output.
+  its screen. All viewers get `ExtendedDesktopSize`. Our single output
+  covers the whole framebuffer. Multi-screen layouts are used to place
+  the outputs of a nested compositor (see above), and are otherwise only
+  metadata.
 * **Xwayland** is started when the compositor starts. Disable it with
   `-Xwayland=0`. Its display number is chosen automatically by wlroots,
   and is not necessarily the VNC display number.
@@ -141,6 +185,8 @@ Without `--wayland` or `mode=wayland`, nothing changes.
 | `unix/xserver/hw/vnc/Xvnc.man` | synopsis + WAYLAND MODE section |
 | `unix/xvnc-wayland/` | new: the Wayland mode server (`Xvnc-wayland`) |
 | `unix/xvnc-wayland/protocol/wlr-layer-shell-unstable-v1.xml` | protocol XML (from wlroots 0.19.2, MIT-style licence) for a header wlroots needs |
+| `unix/xvnc-wayland/protocol/wlr-data-control-unstable-v1.xml` | protocol XML (from wlroots 0.19.2) for the nested clipboard bridge's client code |
+| `unix/xvnc-wayland/nested_bridge.{h,c}` | nested compositor detection helper and clipboard bridge |
 | `CMakeLists.txt`, `unix/CMakeLists.txt` | `ENABLE_WAYLAND_SERVER` (AUTO/ON/OFF), `WLROOTS_PKG` |
 | `config.h.in` | `CMAKE_INSTALL_FULL_SYSCONFDIR` for vncsession |
 | `unix/vncserver/vncserver.in` | `mode=` handling, Wayland session start |
@@ -160,7 +206,8 @@ Reference platform: Ubuntu 26.04 (resolute), as pinned in
 | Xorg server source (`xorg-server-source`) | 2:21.1.22-1ubuntu1.3 (built with `unix/xserver21.patch`) |
 | Xwayland | 2:24.1.10-1 |
 | wayland-protocols | 1.47 |
-| libwayland, xkbcommon, pixman, libdrm, xcb | distro versions |
+| libwayland (server and client), xkbcommon, pixman, libdrm, xcb | distro versions |
+| sway, labwc (test image only) | Ubuntu 26.04 versions, used by the nested tests |
 
 wlroots breaks its API between minor releases. The code targets 0.19
 only, and `WLROOTS_PKG` must name a 0.19 build.
@@ -207,10 +254,14 @@ session=<name of a /usr/share/wayland-sessions/*.desktop file>
 Then start the service: `systemctl start vncserver@:1`, with
 `:1=user` in `/etc/tigervnc/vncserver.users`.
 
-A wlroots-based desktop such as `labwc` or `sway` should be able to run
-nested as the session command, as a window in this compositor. This is
-untested. Nested compositors are not in the test image, and the window
-is not automatically made full size.
+A full desktop compositor can be the session, e.g. `session=sway` or
+`session=labwc` (their stock `.desktop` files), or
+`Xvnc --wayland :1 ... -- sway`. It gets the whole screen and follows
+viewer resizes. To give sway one output per viewer monitor, start it with
+`WLR_WL_OUTPUTS=2` (for example in a wrapper session script) and use a
+viewer with a two-screen layout. `-NestedCompositor Off` turns this
+off, and `On` forces it for compositors whose socket isn't found (then
+there is no clipboard bridge).
 
 ## Tests
 
@@ -221,15 +272,41 @@ Run with `contrib/wayland-mode/run-tests.sh`. Results are in
 
 * `test_x11.py`: regression for plain `Xvnc` and `Xvnc --x11`.
 * `test_wayland.py`: the Wayland mode criteria.
+* `test_nested.py`: a real nested sway, and labwc: detection,
+  fullscreen over VNC, keyboard and pointer into foot inside sway, both
+  selections both ways, resize, a two-screen layout mapped to two sway
+  outputs, labwc clipboard and resize, and `NestedCompositor=Off`
+  falling back to the floating WM.
 * `test_vncsession.py`: the vncsession → PAM → vncserver → Xvnc path,
-  as root.
+  as root, including the stock `sway.desktop` session (Super+Return
+  opens sway's terminal, typing and resize).
 * `test_systemd.py`: `vncserver@.service` under systemd with
   pam_systemd/logind, in a privileged container.
 
 ## Limitations / known gaps
 
-* Single output: multi-screen `SetDesktopSize` layouts are kept as
-  metadata only.
+* Single output of our own: multi-screen `SetDesktopSize` layouts only
+  matter for nested compositor outputs. Ordinary windows and Xwayland see
+  one big screen, so "maximize" covers all monitors.
+* Nested compositors:
+  * The clipboard bridge needs `wlr-data-control` in the nested
+    compositor. sway, labwc and other wlroots compositors have it. KDE
+    and GNOME (which can't run nested this way anyway) don't, so with
+    KDE Plasma the display works but the clipboard is not bridged.
+    ext-data-control is not used yet.
+  * Detection needs the nested compositor's socket in the same
+    `XDG_RUNTIME_DIR` and owned by the same user, which is the normal
+    case.
+  * labwc applies a new output size at once but only repaints when
+    something on its output changes. Until then the old picture is shown
+    at the old size. The test interacts with foot in labwc after each
+    resize, as a user would.
+  * Only text MIME types reach the viewer, as for any client. Other
+    types are passed between the nested seat and our seat.
+  * Under Docker's default 64 MiB `/dev/shm`, several servers with nested
+    compositors at once can run out of shm. wlroots then dies with
+    SIGBUS while rendering. The test stops each server before starting
+    the next one. Normal hosts have a much larger `/dev/shm`.
 * Depth 24 (XRGB8888) only. `-depth` other than 24 is refused.
 * No `vncconfig` equivalent. `QueryConnect` therefore rejects
   connections, as Xvnc does when no vncconfig is running. Runtime

@@ -2545,11 +2545,18 @@ struct wvnc_compositor* wvnc_compositor_create(const struct wvnc_options* opts,
 {
   struct wvnc_compositor* c = calloc(1, sizeof(*c));
   const char* dbg = getenv("TIGERVNC_WLR_DEBUG");
+  char* saved_scanout_env;
 
   wlr_log_init(dbg && *dbg ? WLR_DEBUG : WLR_ERROR, NULL);
 
   /* We read rendered frames back from the output buffer, so the
-   * scene must always composite into it */
+   * scene must always composite into it. wlroots reads this in
+   * wlr_scene_create(); the session (e.g. a nested compositor) must
+   * not inherit it, so the old value is put back afterwards. */
+  {
+    const char* v = getenv("WLR_SCENE_DISABLE_DIRECT_SCANOUT");
+    saved_scanout_env = v ? strdup(v) : NULL;
+  }
   setenv("WLR_SCENE_DISABLE_DIRECT_SCANOUT", "1", 1);
 
   c->cb = *cb;
@@ -2607,6 +2614,13 @@ struct wvnc_compositor* wvnc_compositor_create(const struct wvnc_options* opts,
   wlr_xdg_output_manager_v1_create(c->display, c->output_layout);
 
   c->scene = wlr_scene_create();
+  if (saved_scanout_env) {
+    setenv("WLR_SCENE_DISABLE_DIRECT_SCANOUT", saved_scanout_env, 1);
+    free(saved_scanout_env);
+    saved_scanout_env = NULL;
+  } else {
+    unsetenv("WLR_SCENE_DISABLE_DIRECT_SCANOUT");
+  }
   c->scene_layout = wlr_scene_attach_output_layout(c->scene, c->output_layout);
 
   {

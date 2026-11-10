@@ -378,6 +378,23 @@ be moved and resized with the usual client-side decorations.
 \fBvncconfig\fP and \fBQueryConnect\fP are not available in Wayland mode.
 Run \fBXvnc \-\-wayland \-help\fP for the full list of options.
 
+The session can also be a complete Wayland compositor of its own, such as
+\fBsway\fP, \fBlabwc\fP or KDE Plasma, running nested with its Wayland
+backend. Such a compositor is recognised because the program that opens the
+window also serves its own Wayland socket. Each of its outputs then gets a
+whole screen, without decorations, and follows the size the viewer asks for.
+If the viewer sends a layout with several screens and the nested compositor
+has as many outputs (for sway, start it with \fBWLR_WL_OUTPUTS=\fP\fIn\fP),
+output \fIi\fP is shown on screen \fIi\fP. Otherwise a single output covers
+the whole framebuffer. Keyboard and pointer input go to the nested
+compositor. The clipboard and primary selection are copied both ways through
+its \fBwlr\-data\-control\fP protocol.
+.TP
+.B \-NestedCompositor \fIAuto|On|Off\fP
+\fBAuto\fP (the default) detects nested compositors as described above.
+\fBOn\fP gives every top level window without a parent a whole screen.
+\fBOff\fP treats nested compositors like any other window.
+
 .SH USAGE WITH INETD
 By configuring the \fBinetd\fP(1) service appropriately, Xvnc can be launched
 on demand when a connection comes in, rather than having to be started
