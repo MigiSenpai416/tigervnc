@@ -384,7 +384,7 @@ decorations. Maximize and fullscreen fill one screen of the viewer's layout.
 X11 windows get a simple title bar for moving, maximizing and closing them.
 \fBwlr\-randr\fP and similar tools can change the size of the output.
 \fBvncconfig\fP works through a control socket,
-\fI$XDG_RUNTIME_DIR/\fP\fIsocket\fP\fB.vncconfig\fP, but there is no
+\fI$XDG_RUNTIME_DIR/tigervnc\-\fP\fIsocket\fP\fB.vncconfig\fP, but there is no
 \fBQueryConnect\fP dialog. Run \fBXvnc \-\-wayland \-help\fP for the full
 list of options.
 
@@ -412,7 +412,7 @@ the X server ends with the session too.
 .TP
 .B \-XwaylandAuth
 Give Xwayland a private X authority file with a random
-MIT-MAGIC-COOKIE-1 key, \fI$XDG_RUNTIME_DIR/\fP\fIsocket\fP\fB.Xauthority\fP,
+MIT-MAGIC-COOKIE-1 key, \fI$XDG_RUNTIME_DIR/tigervnc\-\fP\fIsocket\fP\fB.Xauthority\fP,
 and set \fBXAUTHORITY\fP for the session. Default is on.
 .TP
 .B \-X11TitleBars

@@ -530,8 +530,9 @@ int main(int argc, char** argv)
     ssize_t n = readlink("/proc/self/exe", self, sizeof(self) - 1);
     if (n > 0) {
       self[n] = '\0';
-      std::string auth = std::string(getenv("XDG_RUNTIME_DIR")) + "/" +
-                         socketName + ".Xauthority";
+      // Not "wayland-*": tools look for Wayland sockets by that name
+      std::string auth = std::string(getenv("XDG_RUNTIME_DIR")) +
+                         "/tigervnc-" + socketName + ".Xauthority";
       const char* user = getenv("WLR_XWAYLAND");
       if (user && *user) {
         setenv("TIGERVNC_XWAYLAND_REAL", user, 1);
@@ -627,11 +628,15 @@ int main(int argc, char** argv)
     // vncconfig's way in (instead of the VNC X extension)
     std::unique_ptr<ControlSocket> control;
     try {
+      // Not "wayland-*", which clients scan for compositor sockets
       control.reset(new ControlSocket(std::string(getenv("XDG_RUNTIME_DIR")) +
-                                      "/" + desktop.socketName() +
+                                      "/tigervnc-" + desktop.socketName() +
                                       ".vncconfig", &server));
       vlog.info(_("vncconfig control socket: %s"),
                 control->getPath().c_str());
+      // vncconfig finds it through this, also from inside a nested
+      // compositor whose WAYLAND_DISPLAY is a different socket
+      setenv("TIGERVNC_VNCCONFIG", control->getPath().c_str(), 1);
     } catch (std::exception& e) {
       vlog.error(_("No vncconfig control socket: %s"), e.what());
     }

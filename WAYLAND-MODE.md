@@ -185,7 +185,11 @@ Without `--wayland` or `mode=wayland`, nothing changes.
   single screen. Disabling the output, or changing its position, scale
   or transform, is refused.
 * **vncconfig.** There is no VNC X extension, so `Xvnc-wayland` listens
-  on `$XDG_RUNTIME_DIR/<wayland socket>.vncconfig` (`ControlSocket.cxx`).
+  on `$XDG_RUNTIME_DIR/tigervnc-<wayland socket>.vncconfig`
+  (`ControlSocket.cxx`; exported to the session as `TIGERVNC_VNCCONFIG`,
+  so it also works from inside a nested compositor). Neither this nor
+  the Xauthority file starts with `wayland-`, because clients scan for
+  `wayland-*` sockets.
   Only the owner can use it: the socket is mode 0700 and the peer uid is
   checked. When the X display has no VNC extension, `vncconfig` uses
   this socket instead. `-list`, `-get` (never the password), `-desc`,
@@ -201,7 +205,7 @@ Without `--wayland` or `mode=wayland`, nothing changes.
   Xwayland without access control. `Xvnc-wayland` sets `WLR_XWAYLAND`
   to its own executable. Started as `Xwayland`, it writes a fresh
   random `MIT-MAGIC-COOKIE-1` for that display to
-  `$XDG_RUNTIME_DIR/<wayland socket>.Xauthority` (mode 0600, written to
+  `$XDG_RUNTIME_DIR/tigervnc-<wayland socket>.Xauthority` (mode 0600, written to
   a temporary file and renamed). It then execs the real Xwayland
   (the user's `WLR_XWAYLAND` if one was set, otherwise `Xwayland` from
   `PATH`) with `-auth`. The session gets `XAUTHORITY`. X clients

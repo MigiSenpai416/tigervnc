@@ -954,7 +954,7 @@ def t_vncconfig():
     try:
         wait_tcp(5912, timeout=20)
         env = small_app_env(envf)
-        sock = os.path.join(runtime, "wayland-12.vncconfig")
+        sock = os.path.join(runtime, "tigervnc-wayland-12.vncconfig")
         mode = stat.S_IMODE(os.stat(sock).st_mode) if os.path.exists(sock) \
             else None
         # only the owner may connect (the server checks the peer uid too)

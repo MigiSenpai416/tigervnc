@@ -207,24 +207,24 @@ static void usage()
 }
 
 // Wayland mode ("Xvnc --wayland") has no VNC X extension; the server
-// listens on $XDG_RUNTIME_DIR/<WAYLAND_DISPLAY>.vncconfig instead.
+// listens on a control socket instead: $TIGERVNC_VNCCONFIG (set for the
+// session) or $XDG_RUNTIME_DIR/tigervnc-<WAYLAND_DISPLAY>.vncconfig.
 
 static std::string waylandControlPath()
 {
+  const char* env = getenv("TIGERVNC_VNCCONFIG");
   const char* wd = getenv("WAYLAND_DISPLAY");
   const char* rt = getenv("XDG_RUNTIME_DIR");
   std::string path;
   struct stat st;
 
-  if (!wd || !*wd)
-    return "";
-  if (wd[0] == '/')
-    path = wd;
-  else if (rt && *rt)
-    path = std::string(rt) + "/" + wd;
-  else
-    return "";
-  path += ".vncconfig";
+  if (env && *env) {
+    path = env;
+  } else {
+    if (!wd || !*wd || !rt || !*rt || strchr(wd, '/'))
+      return "";
+    path = std::string(rt) + "/tigervnc-" + wd + ".vncconfig";
+  }
   if (stat(path.c_str(), &st) != 0 || !S_ISSOCK(st.st_mode))
     return "";
   return path;
