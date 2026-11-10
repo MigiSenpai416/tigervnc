@@ -185,7 +185,8 @@ def t_wayland_stop():
 s.run("vncsession with mode=wayland starts Xvnc-wayland as the user, "
       "XDG_SESSION_TYPE=wayland for PAM", t_wayland_start)
 s.run("Wayland session environment", t_wayland_session_env)
-s.run("Wayland session visible over VNC (foot + xterm)", t_wayland_view)
+s.run("Wayland session visible over VNC (foot + xterm)", t_wayland_view,
+      needs=['foot'])
 s.run("session log", t_wayland_log)
 s.run("stop", t_wayland_stop)
 
@@ -320,9 +321,11 @@ def t_sway_session_input():
 
 
 s.run("vncsession starts the stock sway session (sway.desktop) as a "
-      "nested compositor", t_sway_session)
+      "nested compositor", t_sway_session,
+      needs=['sway', 'swaymsg'])
 s.run("stock sway session: Super+Return opens foot, typed command runs "
-      "inside sway, resize follows", t_sway_session_input)
+      "inside sway, resize follows", t_sway_session_input,
+      needs=['sway', 'swaymsg', 'foot'])
 stop_session(state.get("pid6") or 0, ":6")
 
 

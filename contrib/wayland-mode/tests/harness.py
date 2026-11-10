@@ -32,8 +32,36 @@ class Suite:
               flush=True)
         return ok
 
-    def run(self, test, func):
-        """Run func(); it returns (ok, detail[, artifacts])."""
+    def missing(self, tools):
+        """The test tools (programs) of `tools` that are not installed."""
+        import shutil
+        return [t for t in tools if shutil.which(t) is None]
+
+    def skip_all(self, reason):
+        """Every following run() is recorded as SKIP with `reason`."""
+        self.skip_reason = reason
+
+    @property
+    def skipping(self):
+        return bool(getattr(self, "skip_reason", None))
+
+    def skip(self, test, reason):
+        self.results.append({"suite": self.name, "test": test,
+                             "status": "SKIP", "detail": reason,
+                             "artifacts": []})
+        print("[SKIP] %s: %s %s" % (self.name, test, reason), flush=True)
+        return True
+
+    def run(self, test, func, needs=()):
+        """Run func(); it returns (ok, detail[, artifacts]). `needs`: test
+        tools (Wayland clients) the test drives; if one is not installed
+        on this distro the test is recorded as SKIP, never as PASS."""
+        if self.skipping:
+            return self.skip(test, self.skip_reason)
+        gone = self.missing(needs)
+        if gone:
+            return self.skip(test, "needs %s, not installed on this "
+                             "distro" % ", ".join(gone))
         try:
             r = func()
             if len(r) == 2:
@@ -68,9 +96,12 @@ class Suite:
         path = os.path.join(ARTIFACTS, "results-%s.json" % self.name)
         with open(path, "w") as f:
             json.dump(self.results, f, indent=2)
-        failed = [r for r in self.results if r["status"] != "PASS"]
-        print("== %s: %d passed, %d failed" %
-              (self.name, len(self.results) - len(failed), len(failed)))
+        failed = [r for r in self.results if r["status"] == "FAIL"]
+        skipped = [r for r in self.results if r["status"] == "SKIP"]
+        print("== %s: %d passed, %d failed%s" %
+              (self.name, len(self.results) - len(failed) - len(skipped),
+               len(failed),
+               ", %d skipped" % len(skipped) if skipped else ""))
         return 1 if failed else 0
 
 

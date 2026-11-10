@@ -210,7 +210,8 @@ def t_xterm_render():
         [shot]
 
 
-s.run("Wayland client renders (foot)", t_foot_render)
+s.run("Wayland client renders (foot)", t_foot_render,
+      needs=['foot'])
 s.run("X11 clients render via Xwayland (xterm, xeyes)", t_xterm_render)
 
 
@@ -246,7 +247,8 @@ def t_x_keyboard():
         "file content %r" % content, [shot]
 
 
-s.run("keyboard input reaches Wayland client (foot)", t_wl_keyboard)
+s.run("keyboard input reaches Wayland client (foot)", t_wl_keyboard,
+      needs=['foot'])
 s.run("keyboard input reaches X11 client (xterm via Xwayland)", t_x_keyboard)
 
 
@@ -297,9 +299,11 @@ def t_x_pointer():
 
 
 s.run("pointer motion+buttons reach Wayland client (foot word "
-      "selection by double click)", t_wl_pointer)
+      "selection by double click)", t_wl_pointer,
+      needs=['foot', 'wl-paste'])
 s.run("pointer motion+buttons reach X11 client (xterm selection, "
-      "xdotool pointer position)", t_x_pointer)
+      "xdotool pointer position)", t_x_pointer,
+      needs=['wl-paste'])
 
 
 def t_clip_wl_to_vnc():
@@ -367,15 +371,19 @@ def t_clip_paste_into_foot():
 
 
 s.run("clipboard Wayland -> viewer (wl-copy -> ServerCutText)",
-      t_clip_wl_to_vnc)
+      t_clip_wl_to_vnc,
+      needs=['wl-copy'])
 s.run("primary selection Wayland -> viewer (wl-copy --primary)",
-      t_primary_wl_to_vnc)
+      t_primary_wl_to_vnc,
+      needs=['wl-copy'])
 s.run("clipboard viewer -> Wayland+X11 (ClientCutText -> wl-paste, "
-      "wl-paste --primary, xclip)", t_clip_vnc_to_wl)
+      "wl-paste --primary, xclip)", t_clip_vnc_to_wl,
+      needs=['wl-paste'])
 s.run("clipboard X11 app -> viewer (xclip via Xwayland -> "
       "ServerCutText)", t_clip_x_to_vnc)
 s.run("clipboard viewer -> paste into foot with Ctrl+Shift+V",
-      t_clip_paste_into_foot)
+      t_clip_paste_into_foot,
+      needs=['foot'])
 
 
 def output_mode():
@@ -445,9 +453,12 @@ def t_input_after_resize():
 
 
 s.run("client resize 1024x768 -> 1280x720 changes the output "
-      "(viewers, wl_output mode, Xwayland screen)", t_resize)
-s.run("client resize to 1000x700", t_resize_odd)
-s.run("input still works after resize", t_input_after_resize)
+      "(viewers, wl_output mode, Xwayland screen)", t_resize,
+      needs=['wayland-info'])
+s.run("client resize to 1000x700", t_resize_odd,
+      needs=['foot', 'wayland-info'])
+s.run("input still works after resize", t_input_after_resize,
+      needs=['foot'])
 
 
 def t_weston_terminal():
@@ -469,7 +480,8 @@ def t_weston_terminal():
             out.strip(), changed), [shot]
 
 
-s.run("second Wayland client (weston-terminal) starts", t_weston_terminal)
+s.run("second Wayland client (weston-terminal) starts", t_weston_terminal,
+      needs=['weston-terminal'])
 
 
 def t_xauth():
@@ -611,7 +623,8 @@ def t_depth16():
                 "background %r" % (pf[0], pf[1], box, corner)), [shot]
 
 
-s.run("-depth 16: native RGB565 framebuffer, picture correct", t_depth16)
+s.run("-depth 16: native RGB565 framebuffer, picture correct", t_depth16,
+      needs=['foot'])
 
 
 def t_ignored_x_options():
@@ -830,7 +843,8 @@ def t_multiscreen_wm():
 
 
 s.run("built-in WM with two screens: windows open, maximize and go "
-      "fullscreen on one screen (Wayland and X11)", t_multiscreen_wm)
+      "fullscreen on one screen (Wayland and X11)", t_multiscreen_wm,
+      needs=['foot'])
 
 
 def t_output_management():
@@ -873,7 +887,8 @@ def t_output_management():
 
 s.run("wlr-output-management: wlr-randr --custom-mode resizes the "
       "desktop for all viewers; unsupported changes are refused",
-      t_output_management)
+      t_output_management,
+      needs=['wlr-randr'])
 def xwin_geometry(env, wid):
     import re
     rc, out = sh(["xdotool", "getwindowgeometry", wid], env=env)
@@ -1180,7 +1195,8 @@ def t_vncconfig():
 
 s.run("vncconfig works in Wayland mode (control socket): -list -get "
       "-desc -set/AllowOverride, desktop rename, -disconnect, -connect",
-      t_vncconfig)
+      t_vncconfig,
+      needs=['wl-copy'])
 
 
 def t_query_connect():

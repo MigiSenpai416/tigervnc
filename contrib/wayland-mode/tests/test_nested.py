@@ -26,6 +26,10 @@ BG = (0x33, 0x66, 0xaa)          # sway output background in sway.cfg
 FOOT_BG = (0x24, 0x24, 0x24)     # foot's default background
 
 s = Suite("nested")
+# sway and foot are the nested compositor and its client in every test
+_gone = s.missing(["sway", "swaymsg", "foot"])
+if _gone:
+    s.skip_all("needs %s, not installed on this distro" % ", ".join(_gone))
 os.makedirs(WORK, exist_ok=True)
 passwd = os.path.join(WORK, "passwd")
 make_vnc_passwd(passwd, PASSWORD)
@@ -44,6 +48,8 @@ def start(display, outputs, geometry="1024x768", extra=(), session=None):
     dir)."""
     runtime = os.path.join(WORK, "rt-%d" % display)
     os.makedirs(runtime, mode=0o700, exist_ok=True)
+    if s.skipping:
+        return None, None, runtime
     cfg = os.path.join(WORK, "sway.cfg")
     with open(cfg, "w") as f:
         f.write(SWAY_CFG)
@@ -169,10 +175,11 @@ def t_detect():
 
 s.run("sway session detected as nested compositor, clipboard bridge "
       "connected", t_detect)
-if not nenv:
+if not nenv and not s.skipping:
     sys.exit(s.finish())
 
-vnc = RFBClient(port=PORT, security="VncAuth", password=PASSWORD)
+vnc = None if s.skipping else \
+    RFBClient(port=PORT, security="VncAuth", password=PASSWORD)
 
 
 def t_fullscreen():
@@ -241,7 +248,8 @@ def t_pointer():
 
 
 s.run("pointer reaches nested client (double click selects word), "
-      "primary nested -> viewer", t_pointer)
+      "primary nested -> viewer", t_pointer,
+      needs=['wl-paste'])
 
 
 def t_clip_nested_to_vnc():
@@ -279,9 +287,11 @@ def t_paste_into_nested_foot():
 
 
 s.run("clipboard nested -> viewer (wl-copy in sway -> ServerCutText)",
-      t_clip_nested_to_vnc)
+      t_clip_nested_to_vnc,
+      needs=['wl-copy'])
 s.run("clipboard viewer -> nested (ClientCutText -> wl-paste and "
-      "wl-paste --primary in sway)", t_clip_vnc_to_nested)
+      "wl-paste --primary in sway)", t_clip_vnc_to_nested,
+      needs=['wl-paste'])
 s.run("clipboard viewer -> paste into foot inside sway with "
       "Ctrl+Shift+V", t_paste_into_nested_foot)
 
@@ -312,7 +322,8 @@ def t_resize():
 
 s.run("client resize: nested output follows (1024x768 -> 1280x720)",
       t_resize)
-vnc.close()
+if vnc:
+    vnc.close()
 stop(server)
 
 # --------------------------------------------------- 2 outputs, 2 screens
@@ -457,7 +468,8 @@ def t_labwc():
 
 
 s.run("labwc session: detected, output fills the screen, clipboard both "
-      "ways, resize follows", t_labwc)
+      "ways, resize follows", t_labwc,
+      needs=['labwc', 'wlr-randr', 'wl-copy', 'wl-paste'])
 stop(server3)
 
 # ------------------------------------------------- NestedCompositor=Off

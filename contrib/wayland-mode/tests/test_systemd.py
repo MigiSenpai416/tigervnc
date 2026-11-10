@@ -142,7 +142,8 @@ def t_stop():
 
 
 s.run("vncserver@:1.service, mode=wayland: Wayland session, logind "
-      "session Type=wayland", t_wayland_unit)
+      "session Type=wayland", t_wayland_unit,
+      needs=['foot'])
 s.run("vncserver@:2.service, no mode: X11 session, logind Type=x11",
       t_x11_unit)
 s.run("systemctl stop ends both sessions", t_stop)
