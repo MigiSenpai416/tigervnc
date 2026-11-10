@@ -464,8 +464,9 @@ s.run("input still works after resize", t_input_after_resize,
 def t_weston_terminal():
     vnc.refresh()
     before_fb = bytes(vnc.fb)
+    # WAYLAND_DEBUG: the protocol log shows which globals it binds
     s.spawn("weston-terminal", ["weston-terminal", "--shell=/bin/bash"],
-            env=app_env)
+            env=dict(app_env, WAYLAND_DEBUG="client"))
     time.sleep(4)
     vnc.request_update(True)
     vnc.pump(0.5)
@@ -475,9 +476,30 @@ def t_weston_terminal():
     changed = sum(1 for i in range(0, min(len(before), len(vnc.fb)), 16)
                   if before[i:i + 3] != vnc.fb[i:i + 3])
     rc, out = sh("ps -C weston-terminal -o pid=", env=app_env)
-    return out.strip() != "" and changed > 2000, \
-        "weston-terminal pid %s, %d sampled pixels changed" % (
-            out.strip(), changed), [shot]
+    ok = out.strip() != "" and changed > 2000
+    detail = "weston-terminal pid %s, %d sampled pixels changed" % (
+        out.strip(), changed)
+    if not ok:
+        # An old weston-terminal (weston < 5) only knows zxdg_shell_v6 /
+        # wl_shell, which wlroots 0.19 does not offer: SKIP only when its
+        # own protocol log proves it saw xdg_wm_base and did not bind it
+        import re
+        log = open(s.artifact("logs/weston-terminal.log"),
+                   errors="replace").read()
+        offered = set(re.findall(r'wl_registry@\d+\.global\(\d+, "(\w+)"',
+                                 log))
+        bound = set(re.findall(r'-> wl_registry@\d+\.bind\(\d+, "(\w+)"',
+                               log))
+        if "xdg_wm_base" in offered and "wl_compositor" in bound and \
+                "xdg_wm_base" not in bound:
+            ver = sh("dpkg-query -W -f '${Version}' weston")[1].strip()
+            return "SKIP", ("weston-terminal (weston %s) does not speak "
+                            "xdg_wm_base: it was offered but not bound "
+                            "(WAYLAND_DEBUG: bound %s; %s)" %
+                            (ver or "?", sorted(bound), detail))
+        detail += "; offered xdg_wm_base=%s, bound %s" % (
+            "xdg_wm_base" in offered, sorted(bound))
+    return ok, detail, [shot]
 
 
 s.run("second Wayland client (weston-terminal) starts", t_weston_terminal,

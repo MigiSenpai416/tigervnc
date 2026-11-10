@@ -53,7 +53,8 @@ class Suite:
         return True
 
     def run(self, test, func, needs=()):
-        """Run func(); it returns (ok, detail[, artifacts]). `needs`: test
+        """Run func(); it returns (ok, detail[, artifacts]), or ("SKIP",
+        reason) when it proved the test does not apply. `needs`: test
         tools (Wayland clients) the test drives; if one is not installed
         on this distro the test is recorded as SKIP, never as PASS."""
         if self.skipping:
@@ -64,6 +65,8 @@ class Suite:
                              "distro" % ", ".join(gone))
         try:
             r = func()
+            if r[0] == "SKIP":   # the test proved it cannot apply here
+                return self.skip(test, r[1])
             if len(r) == 2:
                 return self.check(test, r[0], r[1])
             return self.check(test, r[0], r[1], r[2])
