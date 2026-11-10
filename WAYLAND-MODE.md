@@ -355,6 +355,28 @@ SRC=$PWD BUILD=/tmp/build contrib/wayland-mode/build.sh
 `Xvnc` goes to `/usr/bin`, and `Xvnc-wayland` goes to `/usr/libexec`
 (`CMAKE_INSTALL_LIBEXECDIR`).
 
+### Portable tarball
+
+A relocatable `tigervnc-<version>.<arch>.tar.gz` (prefix `/usr`) can be
+checked on a clean distro image with `test-tarball.sh`. That extracts
+the tarball and runs the full suite (X11 + Wayland) against it.
+
+```sh
+PROXY=... contrib/wayland-mode/test-tarball.sh /path/to/tigervnc-*.tar.gz ubuntu:26.04
+```
+
+Runtime dependencies on the target are only glibc (>= 2.27), libGL
+(Mesa, plus `swrast_dri.so` for GLX), libpam, and libsystemd/libgbm
+when those features are on. `/usr/share/tigervnc/check-runtime.sh`
+checks them.
+
+`xinit` and `xauth` are optional and are not bundled. As upstream does,
+the distro's packages are used, and only X11 sessions started through
+`vncserver`/`vncsession` (and `vncserver@.service`) need them. Starting
+`Xvnc` or `Xvnc --wayland` directly needs neither, and nor does
+`mode=wayland`. The tarball test image installs `xinit` and `xauth` for
+the X11 vncsession/systemd tests.
+
 ## Usage
 
 ```sh
