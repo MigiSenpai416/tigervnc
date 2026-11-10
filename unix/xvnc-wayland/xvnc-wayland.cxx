@@ -194,6 +194,10 @@ static void xwaylandWrapper(int argc, char** argv)
   unsetenv("TIGERVNC_XWAYLAND_REAL");
   if (real && *real)
     execv(real, args.data());
+#ifdef XWAYLAND_PATH
+  else if (XWAYLAND_PATH[0] != '\0')
+    execv(XWAYLAND_PATH, args.data());
+#endif
   else
     execvp("Xwayland", args.data());
   fprintf(stderr, "Xvnc-wayland: unable to run Xwayland: %s\n",

@@ -61,7 +61,17 @@ add_executable(Xvnc-wayland
   ../w0vncserver/qnum_to_xorgevdev.c
 )
 
+# Xwayland to run (default: "Xwayland" on PATH). Builds that bundle a
+# private Xwayland set this to its absolute path; it should match the
+# path wlroots was built with (its xwayland.pc).
+set(XWAYLAND_PATH "" CACHE STRING
+  "Absolute path of the Xwayland binary Xvnc-wayland runs (default: Xwayland on PATH)")
+
 target_include_directories(Xvnc-wayland PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+if(XWAYLAND_PATH)
+  target_compile_definitions(Xvnc-wayland PRIVATE
+    XWAYLAND_PATH="${XWAYLAND_PATH}")
+endif()
 target_compile_definitions(Xvnc-wayland PRIVATE
   WLR_USE_UNSTABLE
   WLROOTS_VERSION_STR="${WLROOTS_VERSION}")
