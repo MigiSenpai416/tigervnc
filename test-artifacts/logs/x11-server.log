@@ -1,0 +1,82 @@
+_XSERVTransmkdir: ERROR: euid != 0,directory /tmp/.X11-unix will not be created.
+
+Xvnc TigerVNC 1.16.80 - built 2026-11-10 08:36
+Copyright (C) 1999-2026 TigerVNC team and many others (see README.rst)
+See https://www.tigervnc.org for information on TigerVNC.
+Underlying X server release 12101022
+
+Could not find any available render nodes
+Failed to initialize DRI3 extension
+
+Tue Nov 10 08:36:37 2026
+ vncext:      VNC extension running
+ vncext:      Listening for VNC connections on local interfaces, port 5902
+ vncext:      Created VNC server for screen 0
+[mi] mieq: warning: overriding existing handler (nil) with 0x5638117f0fc0 for event 2
+[mi] mieq: warning: overriding existing handler (nil) with 0x5638117f0fc0 for event 3
+
+Tue Nov 10 08:36:38 2026
+ Connections: Accepted: 127.0.0.1::36384
+ VNCSConnST:  Closing 127.0.0.1::36384: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::36384
+ Connections: Accepted: 127.0.0.1::36390
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth (2)
+ VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
+              rgb888
+ VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+ Connections: Accepted: 127.0.0.1::36398
+ VNCSConnST:  Closing 127.0.0.1::36390: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::36390
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth (2)
+ SConnection: Authentication error: Authentication failed
+ Connections: Accepted: 127.0.0.1::36406
+ VNCSConnST:  Closing 127.0.0.1::36398: Authentication failed
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::36398
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VeNCrypt (19)
+ SVeNCrypt:   Client requests security type X509Vnc (261)
+ VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
+              rgb888
+ VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+ Connections: Accepted: 127.0.0.1::36412
+ VNCSConnST:  Closing 127.0.0.1::36406: Failed receiving TLS data: The TLS
+              connection was non-properly terminated. (-110)
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::36406
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth (2)
+ VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
+              rgb888
+ VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+
+Tue Nov 10 08:36:48 2026
+ VNCSConnST:  Update request 1024x768 at 0,0 exceeds framebuffer 1280x720
+
+Tue Nov 10 08:36:51 2026
+ VNCSConnST:  Closing 127.0.0.1::36412: Clean disconnection
+ EncodeManager: Framebuffer updates: 8
+ EncodeManager:   Raw:
+ EncodeManager:     Solid: 105 rects, 3.9386 Mpixels
+ EncodeManager:            15.0258 MiB (1:1 ratio)
+ EncodeManager:     Bitmap RLE: 14 rects, 27.293 kpixels
+ EncodeManager:                 106.777 KiB (1:1 ratio)
+ EncodeManager:     Indexed RLE: 22 rects, 45.082 kpixels
+ EncodeManager:                  176.359 KiB (1:1 ratio)
+ EncodeManager:     Full color: 10 rects, 8.276 kpixels
+ EncodeManager:                 32.4453 KiB (1:1 ratio)
+ EncodeManager:   Total:: 151 rects, 4.01926 Mpixels
+ EncodeManager:          15.334 MiB (1:1 ratio)
+ Connections: Closed: 127.0.0.1::36412

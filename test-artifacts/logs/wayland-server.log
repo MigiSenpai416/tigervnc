@@ -1,0 +1,137 @@
+
+Tue Nov 10 08:36:54 2026
+ Main:        Wayland display wayland-1 created in /tmp/wltest/xdg-runtime
+              (1024x768)
+ Main:        Listening for VNC connections on local interfaces, port 5901
+Xwayland glamor: GBM Wayland interfaces not available
+Failed to initialize glamor, falling back to sw
+ WaylandDesktop: Xwayland ready on DISPLAY=:0
+ Main:        Started session '/tmp/wltest/session.sh' (pid 14)
+The XKEYBOARD keymap compiler (xkbcomp) reports:
+> Warning:          Unsupported maximum keycode 708, clipping.
+>                   X11 cannot support keycodes above 255.
+> Warning:          Virtual modifier Hyper multiply defined
+>                   Using 0, ignoring 0
+> Warning:          Virtual modifier ScrollLock multiply defined
+>                   Using 0, ignoring 0
+Errors from xkbcomp are not fatal to the X server
+ Connections: Accepted: 127.0.0.1::59628
+ Connections: Accepted: 127.0.0.1::59640
+ SConnection: Client needs protocol version 3.8
+ VNCSConnST:  Closing 127.0.0.1::59628: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::59628
+ SConnection: Client requests security type VncAuth (2)
+ VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
+              rgb888
+ VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+ Connections: Accepted: 127.0.0.1::59652
+ VNCSConnST:  Closing 127.0.0.1::59640: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::59640
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth (2)
+ SConnection: Authentication error: Authentication failed
+ VNCSConnST:  Closing 127.0.0.1::59652: Authentication failed
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::59652
+ Connections: Accepted: 127.0.0.1::59654
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VeNCrypt (19)
+ SVeNCrypt:   Client requests security type X509Vnc (261)
+ VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
+              rgb888
+ VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Closing 127.0.0.1::59654: Failed receiving TLS data: The TLS
+              connection was non-properly terminated. (-110)
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::59654
+ Connections: Accepted: 127.0.0.1::59658
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VeNCrypt (19)
+ SVeNCrypt:   Client requests security type TLSVnc (258)
+ VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
+              rgb888
+ VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Closing 127.0.0.1::59658: Failed receiving TLS data: The TLS
+              connection was non-properly terminated. (-110)
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::59658
+ Connections: Accepted: 127.0.0.1::59670
+ SConnection: Client needs protocol version 3.8
+ VNCSConnST:  Closing 127.0.0.1::59670: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::59670
+ Connections: Accepted: 127.0.0.1::59676
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VeNCrypt (19)
+ SVeNCrypt:   Client requests security type X509Vnc (261)
+ VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
+              rgb888
+ VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+00:00:18.142 [ERROR] [xwayland/xwm.c:1410] Failed to get window property
+00:00:19.176 [ERROR] [xwayland/xwm.c:1410] Failed to get window property
+00:00:23.823 [ERROR] [xwayland/xwm.c:1410] Failed to get window property
+
+Tue Nov 10 08:37:20 2026
+ Connections: Accepted: 127.0.0.1::49376
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth (2)
+ VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
+              rgb888
+ VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+
+Tue Nov 10 08:37:21 2026
+ WaylandDesktop: Framebuffer resized to 1280x720
+ VNCSConnST:  Update request 1024x768 at 0,0 exceeds framebuffer 1280x720
+
+Tue Nov 10 08:37:24 2026
+ VNCSConnST:  Update request 1024x768 at 0,0 exceeds framebuffer 1280x720
+
+Tue Nov 10 08:37:25 2026
+ VNCSConnST:  Closing 127.0.0.1::49376: Clean disconnection
+ EncodeManager: Framebuffer updates: 1
+ EncodeManager:   Raw:
+ EncodeManager:     Solid: 26 rects, 752.951 kpixels
+ EncodeManager:            2.87258 MiB (1:1 ratio)
+ EncodeManager:     Bitmap RLE: 1 rects, 1.118 kpixels
+ EncodeManager:                 4.37891 KiB (1:1 ratio)
+ EncodeManager:     Indexed RLE: 1 rects, 21.12 kpixels
+ EncodeManager:                  82.5117 KiB (1:1 ratio)
+ EncodeManager:     Full color: 4 rects, 11.243 kpixels
+ EncodeManager:                 43.9648 KiB (1:1 ratio)
+ EncodeManager:   Total:: 32 rects, 786.432 kpixels
+ EncodeManager:          3.00037 MiB (1:1 ratio)
+ Connections: Closed: 127.0.0.1::49376
+ WaylandDesktop: Framebuffer resized to 1000x700
+ VNCSConnST:  Update request 1280x720 at 0,0 exceeds framebuffer 1000x700
+
+Tue Nov 10 08:37:37 2026
+ Main:        Terminating
+ VNCSConnST:  Closing 127.0.0.1::59676: Failed receiving TLS data: The TLS
+              connection was non-properly terminated. (-110)
+ EncodeManager: Framebuffer updates: 22
+ EncodeManager:   Raw:
+ EncodeManager:     Solid: 286 rects, 8.64354 Mpixels
+ EncodeManager:            32.9758 MiB (1:1 ratio)
+ EncodeManager:     Bitmap RLE: 30 rects, 38.483 kpixels
+ EncodeManager:                 150.676 KiB (1:1 ratio)
+ EncodeManager:     Indexed RLE: 27 rects, 315.625 kpixels
+ EncodeManager:                  1.20432 MiB (1:1 ratio)
+ EncodeManager:     Full color: 54 rects, 115.126 kpixels
+ EncodeManager:                 450.344 KiB (1:1 ratio)
+ EncodeManager:   Total:: 397 rects, 9.11277 Mpixels
+ EncodeManager:          34.767 MiB (1:1 ratio)
+ Main:        Terminated

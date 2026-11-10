@@ -1,0 +1,27 @@
+[
+  {
+    "suite": "systemd",
+    "test": "vncserver@:1.service, mode=wayland: Wayland session, logind session Type=wayland",
+    "status": "PASS",
+    "detail": "systemctl start rc=0, active=active, logind sessions=[{'Name': 'vncuser', 'Service': 'tigervnc', 'Type': 'wayland', 'Class': 'user', 'State': 'active'}], session XDG_RUNTIME_DIR='/run/user/1001' WAYLAND_DISPLAY='wayland-1', foot (302, 332, 720, 512), xterm (20, 20, 322, 126)",
+    "artifacts": [
+      "/artifacts/systemd-01-wayland-unit.png"
+    ]
+  },
+  {
+    "suite": "systemd",
+    "test": "vncserver@:2.service, no mode: X11 session, logind Type=x11",
+    "status": "PASS",
+    "detail": "active=active, logind sessions=[{'Name': 'vncuser', 'Service': 'tigervnc', 'Type': 'wayland', 'Class': 'user', 'State': 'active'}, {'Name': 'vncuser', 'Service': 'tigervnc', 'Type': 'x11', 'Class': 'user', 'State': 'active'}], xterm (42, 42, 404, 174)",
+    "artifacts": [
+      "/artifacts/systemd-02-x11-unit.png"
+    ]
+  },
+  {
+    "suite": "systemd",
+    "test": "systemctl stop ends both sessions",
+    "status": "PASS",
+    "detail": "after stop: :1 inactive, remaining tigervnc sessions []",
+    "artifacts": []
+  }
+]

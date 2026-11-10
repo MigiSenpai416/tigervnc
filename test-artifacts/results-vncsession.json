@@ -1,0 +1,48 @@
+[
+  {
+    "suite": "vncsession",
+    "test": "vncsession with mode=wayland starts Xvnc-wayland as the user, XDG_SESSION_TYPE=wayland for PAM",
+    "status": "PASS",
+    "detail": "vncsession rc=0 pid=10, port 5901 up=True, servers=[(12, 'Xvnc-wayland', 'vncuser')], server env from vncsession: XDG_SESSION_TYPE='wayland' XDG_SESSION_CLASS='user' ",
+    "artifacts": []
+  },
+  {
+    "suite": "vncsession",
+    "test": "Wayland session environment",
+    "status": "PASS",
+    "detail": "USER=vncuser, XDG_SESSION_TYPE=wayland, WAYLAND_DISPLAY=wayland-1, DISPLAY=:0, XDG_CURRENT_DESKTOP=VncTest, XDG_SESSION_DESKTOP=vnc-test, DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-DBrfhpYI5E,guid=55ce23c38b077c6899ea75286af2d7d4",
+    "artifacts": []
+  },
+  {
+    "suite": "vncsession",
+    "test": "Wayland session visible over VNC (foot + xterm)",
+    "status": "PASS",
+    "detail": "foot area (302, 332, 720, 512), xterm area (20, 20, 322, 126)",
+    "artifacts": [
+      "/artifacts/vncsession-01-wayland-session.png"
+    ]
+  },
+  {
+    "suite": "vncsession",
+    "test": "session log",
+    "status": "PASS",
+    "detail": "/home/vncuser/.local/state/tigervnc/7af06f2560be:1.log (copied to logs/vncsession-wayland-user.log)",
+    "artifacts": []
+  },
+  {
+    "suite": "vncsession",
+    "test": "stop",
+    "status": "PASS",
+    "detail": "vncsession exited and removed its pid file after the server stopped",
+    "artifacts": []
+  },
+  {
+    "suite": "vncsession",
+    "test": "vncsession without mode keeps X11 (Xvnc + Xsession)",
+    "status": "PASS",
+    "detail": "no mode: server env XDG_SESSION_TYPE='x11', servers=[(65, 'Xvnc', 'vncuser')], session DISPLAY=':2'",
+    "artifacts": [
+      "/artifacts/vncsession-02-x11-default.png"
+    ]
+  }
+]
