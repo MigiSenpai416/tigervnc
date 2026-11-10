@@ -29,14 +29,14 @@
 | Result | Test | Detail | Artifacts |
 |---|---|---|---|
 | PASS | vncsession with mode=wayland starts Xvnc-wayland as the user, XDG_SESSION_TYPE=wayland for PAM | vncsession rc=0 pid=10, port 5901 up=True, servers=[(12, 'Xvnc-wayland', 'vncuser')], server env from vncsession: XDG_SESSION_TYPE='wayland' XDG_SESSION_CLASS='user'  |  |
-| PASS | Wayland session environment | USER=vncuser, XDG_SESSION_TYPE=wayland, WAYLAND_DISPLAY=wayland-1, DISPLAY=:0, XDG_CURRENT_DESKTOP=VncTest, XDG_SESSION_DESKTOP=vnc-test, DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-sKDhCQbySC,guid=5bd12626097ddb078f6ece726af3349a |  |
+| PASS | Wayland session environment | USER=vncuser, XDG_SESSION_TYPE=wayland, WAYLAND_DISPLAY=wayland-1, DISPLAY=:0, XDG_CURRENT_DESKTOP=VncTest, XDG_SESSION_DESKTOP=vnc-test, DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-mfMsMILU84,guid=1657907e1420942a69c850546af347b1 |  |
 | PASS | Wayland session visible over VNC (foot + xterm) | foot area (302, 332, 720, 512), xterm area (20, 22, 322, 128) | test-artifacts/vncsession-01-wayland-session.png |
-| PASS | session log | /home/vncuser/.local/state/tigervnc/e8f80b1583bf:1.log (copied to logs/vncsession-wayland-user.log) |  |
+| PASS | session log | /home/vncuser/.local/state/tigervnc/a7f54f62c251:1.log (copied to logs/vncsession-wayland-user.log) |  |
 | PASS | stop | vncsession exited and removed its pid file after the server stopped |  |
 | PASS | vncsession without mode keeps X11 (Xvnc + Xsession) | no mode: server env XDG_SESSION_TYPE='x11', servers=[(65, 'Xvnc', 'vncuser')], session DISPLAY=':2' | test-artifacts/vncsession-02-x11-default.png |
 | PASS | vncsession starts the stock sway session (sway.desktop) as a nested compositor | stock sway.desktop via vncsession: rc=0, sway outputs [('WL-1', 1024, 768)], server log ['WaylandDesktop: Client pid 129 (wlroots) is a nested compositor serving', 'WaylandDesktop: Clipboard bridge to nested compositor (pid 129) ready,'] (log copied to logs/vncsession-sway-user.log) | test-artifacts/vncsession-03-sway-session.png |
 | PASS | stock sway session: Super+Return opens foot, typed command runs inside sway, resize follows | Super+Return + typed command in sway's terminal: 'sway-session-42-sway'; after resize to 1280x800 sway outputs [('WL-1', 1280, 800)] | test-artifacts/vncsession-04-sway-terminal.png |
-| PASS | explicit mode=x11 behaves like the default | mode=x11: servers=[(201, 'Xvnc', 'vncuser')], XDG_SESSION_TYPE='x11', Xvnc args '/usr/bin/Xvnc :3 -geometry 1024x768 -localhost -securitytypes VncAuth -auth /home/vncuser/.Xauthority -desktop e8f80b1583bf:3 (vncuser) -fp /usr/share/fonts/X11//misc -pn -rfbauth /home/vncuser/.config/tigervnc/passwd -rfbport 5903' |  |
+| PASS | explicit mode=x11 behaves like the default | mode=x11: servers=[(201, 'Xvnc', 'vncuser')], XDG_SESSION_TYPE='x11', Xvnc args '/usr/bin/Xvnc :3 -geometry 1024x768 -localhost -securitytypes VncAuth -auth /home/vncuser/.Xauthority -desktop a7f54f62c251:3 (vncuser) -fp /usr/share/fonts/X11//misc -pn -rfbauth /home/vncuser/.config/tigervnc/passwd -rfbport 5903' |  |
 | PASS | invalid mode is rejected by vncsession and vncserver | vncsession rc=71, servers=[]; vncserver rc=255: "Invalid mode 'wayland2', must be 'x11' or 'wayland'" |  |
 | PASS | mode value is case-insensitive and whitespace-trimmed | 'mode = Wayland ': servers=[(264, 'Xvnc-wayland', 'vncuser')] XDG_SESSION_TYPE='wayland' |  |
 
@@ -84,9 +84,9 @@
 
 | Result | Test | Detail | Artifacts |
 |---|---|---|---|
-| PASS | Xvnc does not link wlroots | Xvnc links wlroots/wayland-server: [] |  |
+| PASS | Xvnc does not link wlroots | Xvnc NEEDED ['libpam.so.0', 'libpthread.so.0', 'libGL.so.1', 'libgbm.so.1', 'libdl.so.2', 'libm.so.6', 'libc.so.6', 'ld-linux-x86-64.so.2']: wayland/wlroots []; wlroots/wayland-server symbols in the binary []; via system libraries (ldd) [] |  |
 | PASS | Xvnc -help (X server usage + mode flags) | Xvnc -help lists X server options, VNC parameters and the --x11/--wayland lines (logs/x11-Xvnc-help.txt) |  |
-| PASS | Xvnc -version | Xvnc TigerVNC 1.16.2 - built Nov 10 2026 13:45:41 / Copyright (C) 1999-2026 TigerVNC team and many others (see README.rst) / See https://www.tigervnc.org for information on TigerVNC. / Underlying X server release 12101018 |  |
+| PASS | Xvnc -version | Xvnc TigerVNC 1.16.2 - built Nov 10 2026 16:02:11 / Copyright (C) 1999-2026 TigerVNC team and many others (see README.rst) / See https://www.tigervnc.org for information on TigerVNC. / Underlying X server release 12101018 |  |
 | PASS | Xvnc :2 starts (no flag) | port 5902 up=True; dimensions: 1024x768 pixels (271x203 millimeters) depth of root window: 24 planes |  |
 | PASS | auth: VncAuth + X509Vnc, wrong password rejected | VncAuth ok, wrong password rejected, X509Vnc ok (TLSv1.3) |  |
 | PASS | X11 clients render (xterm, xeyes) | xterm area (102, 102, 464, 260), xeyes colours 161 | test-artifacts/x11-01-xterm-xeyes.png |

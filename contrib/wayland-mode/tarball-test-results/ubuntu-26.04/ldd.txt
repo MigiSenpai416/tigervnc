@@ -1,5 +1,5 @@
 == Ubuntu 26.04.1 LTS, ldd (Ubuntu GLIBC 2.43-2ubuntu2.4) 2.43
-running pid 13 exe=/usr/libexec/tigervnc/Xwayland
+running pid 14 exe=/usr/libexec/tigervnc/Xwayland
 -- ldd /usr/bin/Xvnc
 	linux-vdso.so.1
 	libpam.so.0 => /usr/lib/x86_64-linux-gnu/libpam.so.0
@@ -29,7 +29,6 @@ running pid 13 exe=/usr/libexec/tigervnc/Xwayland
 -- ldd /usr/bin/vncconfig
 	linux-vdso.so.1
 	libpthread.so.0 => /usr/lib/x86_64-linux-gnu/libpthread.so.0
-	libdl.so.2 => /usr/lib/x86_64-linux-gnu/libdl.so.2
 	libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6
 	/lib64/ld-linux-x86-64.so.2
 -- ldd /usr/bin/x0vncserver
@@ -39,7 +38,6 @@ running pid 13 exe=/usr/libexec/tigervnc/Xwayland
 	libpam.so.0 => /usr/lib/x86_64-linux-gnu/libpam.so.0
 	librt.so.1 => /usr/lib/x86_64-linux-gnu/librt.so.1
 	libm.so.6 => /usr/lib/x86_64-linux-gnu/libm.so.6
-	libdl.so.2 => /usr/lib/x86_64-linux-gnu/libdl.so.2
 	libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6
 	/lib64/ld-linux-x86-64.so.2
 	libaudit.so.1 => /usr/lib/x86_64-linux-gnu/libaudit.so.1
@@ -78,3 +76,7 @@ running pid 13 exe=/usr/libexec/tigervnc/Xwayland
 	libXau.so.6 => /usr/lib/x86_64-linux-gnu/libXau.so.6
 	libXdmcp.so.6 => /usr/lib/x86_64-linux-gnu/libXdmcp.so.6
 -- ldd /usr/libexec/tigervnc/xkbcomp
+	linux-vdso.so.1
+	libpthread.so.0 => /usr/lib/x86_64-linux-gnu/libpthread.so.0
+	libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6
+	/lib64/ld-linux-x86-64.so.2

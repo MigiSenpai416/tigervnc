@@ -10,7 +10,7 @@
     "suite": "vncsession",
     "test": "Wayland session environment",
     "status": "PASS",
-    "detail": "USER=vncuser, XDG_SESSION_TYPE=wayland, WAYLAND_DISPLAY=wayland-1, DISPLAY=:0, XDG_CURRENT_DESKTOP=VncTest, XDG_SESSION_DESKTOP=vnc-test, DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-sKDhCQbySC,guid=5bd12626097ddb078f6ece726af3349a",
+    "detail": "USER=vncuser, XDG_SESSION_TYPE=wayland, WAYLAND_DISPLAY=wayland-1, DISPLAY=:0, XDG_CURRENT_DESKTOP=VncTest, XDG_SESSION_DESKTOP=vnc-test, DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-mfMsMILU84,guid=1657907e1420942a69c850546af347b1",
     "artifacts": []
   },
   {
@@ -26,7 +26,7 @@
     "suite": "vncsession",
     "test": "session log",
     "status": "PASS",
-    "detail": "/home/vncuser/.local/state/tigervnc/e8f80b1583bf:1.log (copied to logs/vncsession-wayland-user.log)",
+    "detail": "/home/vncuser/.local/state/tigervnc/a7f54f62c251:1.log (copied to logs/vncsession-wayland-user.log)",
     "artifacts": []
   },
   {
@@ -67,7 +67,7 @@
     "suite": "vncsession",
     "test": "explicit mode=x11 behaves like the default",
     "status": "PASS",
-    "detail": "mode=x11: servers=[(201, 'Xvnc', 'vncuser')], XDG_SESSION_TYPE='x11', Xvnc args '/usr/bin/Xvnc :3 -geometry 1024x768 -localhost -securitytypes VncAuth -auth /home/vncuser/.Xauthority -desktop e8f80b1583bf:3 (vncuser) -fp /usr/share/fonts/X11//misc -pn -rfbauth /home/vncuser/.config/tigervnc/passwd -rfbport 5903'",
+    "detail": "mode=x11: servers=[(201, 'Xvnc', 'vncuser')], XDG_SESSION_TYPE='x11', Xvnc args '/usr/bin/Xvnc :3 -geometry 1024x768 -localhost -securitytypes VncAuth -auth /home/vncuser/.Xauthority -desktop a7f54f62c251:3 (vncuser) -fp /usr/share/fonts/X11//misc -pn -rfbauth /home/vncuser/.config/tigervnc/passwd -rfbport 5903'",
     "artifacts": []
   },
   {

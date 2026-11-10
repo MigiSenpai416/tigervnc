@@ -228,7 +228,7 @@
     "suite": "wayland",
     "test": "AvoidShiftNumLock: no fake Shift on keypad keys (xev); keypad keysyms unreachable without NumLock use the plain key",
     "status": "PASS",
-    "detail": "XK_KP_4 (NumLock off), Num_Lock, XK_KP_Left (NumLock on), Num_Lock: default -> X11 key presses [('13', '4'), ('77', 'Num_Lock'), ('113', 'Left'), ('77', 'Num_Lock')] (want [('13', '4'), ('77', 'Num_Lock'), ('113', 'Left'), ('77', 'Num_Lock')]: the arrow key instead of a fake Shift); -AvoidShiftNumLock=0 -> [('13', '4'), ('77', 'Num_Lock'), ('113', 'Left'), ('77', 'Num_Lock')] (want [('13', '4'), ('77', 'Num_Lock'), ('113', 'Left'), ('77', 'Num_Lock')]: keymap has no Shift+NumLock keypad level (xkeyboard-config >= 2.47): plain arrow key, like Xvnc with this data); keymap KEYPAD Shift+NumLock level: False; LED state after Num_Lock 2",
+    "detail": "XK_KP_4 (NumLock off), Num_Lock, XK_KP_Left (NumLock on), Num_Lock: default -> X11 key presses [('13', '4'), ('77', 'Num_Lock'), ('113', 'Left'), ('77', 'Num_Lock')] (want [('13', '4'), ('77', 'Num_Lock'), ('113', 'Left'), ('77', 'Num_Lock')]: the arrow key instead of a fake Shift); -AvoidShiftNumLock=0 -> [('13', '4'), ('77', 'Num_Lock'), ('113', 'Left'), ('77', 'Num_Lock')] (want [('13', '4'), ('77', 'Num_Lock'), ('113', 'Left'), ('77', 'Num_Lock')]: keymap KEYPAD type ignores Shift (xkeyboard-config >= 2.47): plain arrow key, like Xvnc with this data); keymap KEYPAD type uses Shift: False; LED state after Num_Lock 2",
     "artifacts": []
   },
   {
@@ -268,7 +268,7 @@
     "suite": "wayland",
     "test": "vncconfig works in Wayland mode (control socket): -list -get -desc -set/AllowOverride, desktop rename, -disconnect, -connect",
     "status": "PASS",
-    "detail": "control socket /tmp/wltest/xdg-runtime/tigervnc-wayland-12.vncconfig mode 0o700; -list rc=0, 56 names; -get SendCutText -> 'on'; -get Password refused (rc=1 'vncconfig: No such parameter\\nvncconfig: Getting the value of parameter Password failed'); -desc SendCutText -> 'Send clipboard changes to clients.'; -set SendCutText=0 rc=0, now 'off'; with SendCutText=0 the viewer got None; SendCutText=1 rc=0, then the viewer got 'sent-2'; -set desktop=after-rename rc=0, new viewer sees 'after-rename'; -set rfbport=1 refused (rc=1 'vncconfig: Parameter not in AllowOverride\\nvncconfig: Setting the parameter rfbport=1 failed'); -disconnect rc=0, viewer disconnected=True; -connect 127.0.0.1:43147 rc=0, listening viewer got b'RFB 003.008\\n'; vncconfig -nowin keeps running in the background (running after 2 s: True)",
+    "detail": "control socket /tmp/wltest/xdg-runtime/tigervnc-wayland-12.vncconfig mode 0o700; -list rc=0, 56 names; -get SendCutText -> 'on'; -get Password refused (rc=1 'vncconfig: No such parameter\\nvncconfig: Getting the value of parameter Password failed'); -desc SendCutText -> 'Send clipboard changes to clients.'; -set SendCutText=0 rc=0, now 'off'; with SendCutText=0 the viewer got None; SendCutText=1 rc=0, then the viewer got 'sent-2'; -set desktop=after-rename rc=0, new viewer sees 'after-rename'; -set rfbport=1 refused (rc=1 'vncconfig: Parameter not in AllowOverride\\nvncconfig: Setting the parameter rfbport=1 failed'); -disconnect rc=0, viewer disconnected=True; -connect 127.0.0.1:45343 rc=0, listening viewer got b'RFB 003.008\\n'; vncconfig -nowin keeps running in the background (running after 2 s: True)",
     "artifacts": []
   },
   {
