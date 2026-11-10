@@ -1,0 +1,96 @@
+[
+  {
+    "suite": "x11",
+    "test": "Xvnc does not link wlroots",
+    "status": "PASS",
+    "detail": "Xvnc links wlroots/wayland-server: []",
+    "artifacts": []
+  },
+  {
+    "suite": "x11",
+    "test": "Xvnc -help (X server usage + mode flags)",
+    "status": "PASS",
+    "detail": "Xvnc -help lists X server options, VNC parameters and the --x11/--wayland lines (logs/x11-Xvnc-help.txt)",
+    "artifacts": []
+  },
+  {
+    "suite": "x11",
+    "test": "Xvnc -version",
+    "status": "PASS",
+    "detail": "Xvnc TigerVNC 1.16.2 - built Nov 10 2026 13:45:41 / Copyright (C) 1999-2026 TigerVNC team and many others (see README.rst) / See https://www.tigervnc.org for information on TigerVNC. / Underlying X server release 12101018",
+    "artifacts": []
+  },
+  {
+    "suite": "x11",
+    "test": "Xvnc :2 starts (no flag)",
+    "status": "PASS",
+    "detail": "port 5902 up=True; dimensions: 1024x768 pixels (271x203 millimeters) depth of root window: 24 planes",
+    "artifacts": []
+  },
+  {
+    "suite": "x11",
+    "test": "auth: VncAuth + X509Vnc, wrong password rejected",
+    "status": "PASS",
+    "detail": "VncAuth ok, wrong password rejected, X509Vnc ok (TLSv1.3)",
+    "artifacts": []
+  },
+  {
+    "suite": "x11",
+    "test": "X11 clients render (xterm, xeyes)",
+    "status": "PASS",
+    "detail": "xterm area (102, 102, 464, 260), xeyes colours 161",
+    "artifacts": [
+      "/artifacts/x11-01-xterm-xeyes.png"
+    ]
+  },
+  {
+    "suite": "x11",
+    "test": "keyboard input reaches xterm",
+    "status": "PASS",
+    "detail": "file content 'x11-key-ok-42-XTerm(407)'",
+    "artifacts": [
+      "/artifacts/x11-02-typed.png"
+    ]
+  },
+  {
+    "suite": "x11",
+    "test": "pointer input reaches xterm (selection, pointer position)",
+    "status": "PASS",
+    "detail": "PRIMARY='PTRX11TEST' pointer='x:333 y:444 screen:0 window:555'",
+    "artifacts": [
+      "/artifacts/x11-03-selected.png"
+    ]
+  },
+  {
+    "suite": "x11",
+    "test": "clipboard both ways (X11)",
+    "status": "PASS",
+    "detail": "viewer->X CLIPBOARD='x11-from-vnc', X->viewer='x11-from-xclip'",
+    "artifacts": []
+  },
+  {
+    "suite": "x11",
+    "test": "client resize (X11, RandR)",
+    "status": "PASS",
+    "detail": "viewer 1280x720, X screen dimensions: 1280x720 pixels (338x190 millimeters)",
+    "artifacts": [
+      "/artifacts/x11-04-resized-1280x720.png"
+    ]
+  },
+  {
+    "suite": "x11",
+    "test": "Xvnc --x11 runs the X server",
+    "status": "PASS",
+    "detail": "Xvnc --x11 :3 -> vendor string: The X.Org Foundation dimensions: 800x600 pixels (212x159 millimeters)",
+    "artifacts": [
+      "/artifacts/x11-05-x11-flag-800x600.png"
+    ]
+  },
+  {
+    "suite": "x11",
+    "test": "Xvnc --x11 --wayland is rejected",
+    "status": "PASS",
+    "detail": "Xvnc: --x11 and --wayland cannot be combined",
+    "artifacts": []
+  }
+]
