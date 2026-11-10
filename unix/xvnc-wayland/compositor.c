@@ -42,6 +42,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -701,8 +702,7 @@ static void nested_start_bridge(struct wvnc_compositor* c, pid_t pid,
   nested_bridge_destroy(c->bridge);
   c->bridge = nested_bridge_create(c->display, c->seat, path, pid);
   if (!c->bridge)
-    wlr_log(WLR_ERROR, "Unable to connect the clipboard bridge to %s",
-            path);
+    wvnc_log_info("Unable to connect the clipboard bridge to %s", path);
 }
 
 /* Decides whether a new top level window is a nested compositor
@@ -728,15 +728,15 @@ static bool nested_detect(struct view* v)
   path = pid > 0 ? nested_find_socket(getenv("XDG_RUNTIME_DIR"),
                                       c->socket, pid) : NULL;
   if (path) {
-    wlr_log(WLR_INFO, "Client pid %d (%s) is a nested compositor serving "
-            "%s", (int)pid, v->xdg->app_id ? v->xdg->app_id : "?", path);
+    wvnc_log_info("Client pid %d (%s) is a nested compositor serving "
+            "%s, giving it the whole screen", (int)pid, v->xdg->app_id ? v->xdg->app_id : "?", path);
     nested_start_bridge(c, pid, path);
     free(path);
     return true;
   }
 
   if (c->nested_mode == WVNC_NESTED_ON) {
-    wlr_log(WLR_INFO, "NestedCompositor=On: treating window of pid %d as "
+    wvnc_log_info("NestedCompositor=On: treating window of pid %d as "
             "a nested compositor output (no clipboard bridge, its socket "
             "wasn't found)", (int)pid);
     return true;
@@ -2525,6 +2525,21 @@ static void setup_keyboard(struct wvnc_compositor* c)
   wlr_seat_set_keyboard(c->seat, &c->keyboard);
 }
 
+static struct wvnc_callbacks* log_cb;
+
+void wvnc_log_info(const char* fmt, ...)
+{
+  char buf[512];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, ap);
+  va_end(ap);
+  if (log_cb && log_cb->info)
+    log_cb->info(log_cb->data, buf);
+  else
+    wlr_log(WLR_INFO, "%s", buf);
+}
+
 struct wvnc_compositor* wvnc_compositor_create(const struct wvnc_options* opts,
                                                const struct wvnc_callbacks* cb)
 {
@@ -2541,6 +2556,7 @@ struct wvnc_compositor* wvnc_compositor_create(const struct wvnc_options* opts,
   c->width = opts->width;
   c->height = opts->height;
   c->nested_mode = opts->nested_mode;
+  log_cb = &c->cb;
   c->usable_area = (struct wlr_box){ 0, 0, c->width, c->height };
   wl_list_init(&c->views);
   wl_list_init(&c->layers);

@@ -15,6 +15,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -31,6 +32,7 @@
 
 #include "wlr-data-control-unstable-v1-client-protocol.h"
 #include "nested_bridge.h"
+#include "compositor.h"
 
 /* Offered on our own nested-side sources so we can recognise (and
  * ignore) the selection events they cause */
@@ -330,7 +332,7 @@ static void device_finished(void* data,
 {
   struct nested_bridge* b = data;
   (void)dev;
-  wlr_log(WLR_INFO, "Nested compositor ended the clipboard bridge");
+  wvnc_log_info("Nested compositor ended the clipboard bridge");
   mark_dead(b);
 }
 
@@ -436,7 +438,7 @@ static void maybe_create_device(struct nested_bridge* b)
   b->device = zwlr_data_control_manager_v1_get_data_device(b->manager,
                                                            b->seat);
   zwlr_data_control_device_v1_add_listener(b->device, &device_listener, b);
-  wlr_log(WLR_INFO, "Clipboard bridge to nested compositor (pid %d) "
+  wvnc_log_info("Clipboard bridge to nested compositor (pid %d) "
           "ready, wlr-data-control v%u", (int)b->pid, b->manager_version);
   /* Mirror what we already have */
   nested_bridge_host_selection(b);
@@ -480,7 +482,7 @@ static int handle_fd(int fd, uint32_t mask, void* data)
     return 0;
   if (mask & WL_EVENT_READABLE) {
     if (wl_display_dispatch(b->dpy) < 0) {
-      wlr_log(WLR_INFO, "Lost connection to nested compositor");
+      wvnc_log_info("Lost connection to nested compositor");
       mark_dead(b);
       return 0;
     }
@@ -534,7 +536,7 @@ struct nested_bridge* nested_bridge_create(struct wl_display* host_display,
                                       wl_display_get_fd(b->dpy),
                                       WL_EVENT_READABLE, handle_fd, b);
   flush(b);
-  wlr_log(WLR_INFO, "Connecting clipboard bridge to %s", socket_path);
+  wvnc_log_info("Connecting clipboard bridge to %s", socket_path);
   return b;
 }
 

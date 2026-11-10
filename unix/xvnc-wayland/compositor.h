@@ -58,7 +58,13 @@ struct wvnc_callbacks {
   void (*leds)(void* data, unsigned int leds);
   /* Xwayland is up and accepting X11 clients on the given DISPLAY */
   void (*xwayland_ready)(void* data, const char* display);
+  /* Informational message for the server log */
+  void (*info)(void* data, const char* msg);
 };
+
+/* Logs through the info callback of the (only) compositor */
+void wvnc_log_info(const char* fmt, ...)
+  __attribute__((format(printf, 1, 2)));
 
 enum wvnc_nested_mode {
   WVNC_NESTED_AUTO = 0,

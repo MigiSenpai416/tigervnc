@@ -40,6 +40,8 @@ rc=0
   python3 /tests/test_x11.py || rc=1
 "${RUN[@]}" --user vncuser -e HOME=/home/vncuser tigervnc-wl-test \
   python3 /tests/test_wayland.py || rc=1
+"${RUN[@]}" --user vncuser -e HOME=/home/vncuser tigervnc-wl-test \
+  python3 /tests/test_nested.py || rc=1
 "${RUN[@]}" tigervnc-wl-test python3 /tests/test_vncsession.py || rc=1
 
 if [ "${SKIP_SYSTEMD:-0}" != 1 ]; then

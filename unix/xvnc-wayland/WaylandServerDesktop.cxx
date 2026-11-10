@@ -70,6 +70,7 @@ WaylandServerDesktop::WaylandServerDesktop(int width, int height,
   cb.selection_data = cbSelectionData;
   cb.leds = cbLeds;
   cb.xwayland_ready = cbXwaylandReady;
+  cb.info = cbInfo;
 
   comp = wvnc_compositor_create(&opts, &cb);
   if (comp)
@@ -289,4 +290,9 @@ void WaylandServerDesktop::cbXwaylandReady(void* data, const char* display)
   self->xDisplay = display ? display : "";
   self->xReady = true;
   vlog.info(_("Xwayland ready on DISPLAY=%s"), self->xDisplay.c_str());
+}
+
+void WaylandServerDesktop::cbInfo(void* /*data*/, const char* msg)
+{
+  vlog.info("%s", msg);
 }

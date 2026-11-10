@@ -68,6 +68,7 @@ private:
   static void cbSelectionData(void* data, const char* text, size_t len);
   static void cbLeds(void* data, unsigned int leds);
   static void cbXwaylandReady(void* data, const char* display);
+  static void cbInfo(void* data, const char* msg);
 
   rfb::PixelBuffer* createPixelBuffer();
   void setScreens(const rfb::ScreenSet& layout);
