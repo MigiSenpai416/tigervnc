@@ -1,0 +1,10 @@
+NEEDED /usr/bin/Xvnc ['libpam.so.0', 'libpthread.so.0', 'libGL.so.1', 'libgbm.so.1', 'libdl.so.2', 'libm.so.6', 'libc.so.6', 'ld-linux-x86-64.so.2']
+NEEDED /usr/lib/x86_64-linux-gnu/libgbm.so.1.0.0 ['libdrm.so.2', 'libwayland-server.so.0', 'libdl.so.2', 'libm.so.6', 'libexpat.so.1', 'libpthread.so.0', 'libc.so.6']
+-- ldd /usr/bin/Xvnc | grep -E 'wayland|gbm'
+	libgbm.so.1 => /usr/lib/x86_64-linux-gnu/libgbm.so.1 (0x00007f498b718000)
+	libwayland-server.so.0 => /usr/lib/x86_64-linux-gnu/libwayland-server.so.0 (0x00007f498a251000)
+libgbm1:amd64: /usr/lib/x86_64-linux-gnu/libgbm.so.1.0.0
+ii  libgbm1:amd64  20.0.8-0ubuntu1~18.04.1 amd64        generic buffer management API -- runtime
+-- weston-terminal
+ii  weston         3.0.0-1      amd64        reference implementation of a wayland compositor
+      2 zxdg_shell_v6

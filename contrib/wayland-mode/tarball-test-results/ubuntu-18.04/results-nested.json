@@ -1,0 +1,79 @@
+[
+  {
+    "suite": "nested",
+    "test": "sway session detected as nested compositor, clipboard bridge connected",
+    "status": "SKIP",
+    "detail": "needs sway, swaymsg, foot, not installed on this distro",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "nested sway output is fullscreen and undecorated (screenshot over VNC)",
+    "status": "SKIP",
+    "detail": "needs sway, swaymsg, foot, not installed on this distro",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "keyboard input reaches a client of the nested compositor (foot in sway)",
+    "status": "SKIP",
+    "detail": "needs sway, swaymsg, foot, not installed on this distro",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "pointer reaches nested client (double click selects word), primary nested -> viewer",
+    "status": "SKIP",
+    "detail": "needs sway, swaymsg, foot, not installed on this distro",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "clipboard nested -> viewer (wl-copy in sway -> ServerCutText)",
+    "status": "SKIP",
+    "detail": "needs sway, swaymsg, foot, not installed on this distro",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "clipboard viewer -> nested (ClientCutText -> wl-paste and wl-paste --primary in sway)",
+    "status": "SKIP",
+    "detail": "needs sway, swaymsg, foot, not installed on this distro",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "clipboard viewer -> paste into foot inside sway with Ctrl+Shift+V",
+    "status": "SKIP",
+    "detail": "needs sway, swaymsg, foot, not installed on this distro",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "client resize: nested output follows (1024x768 -> 1280x720)",
+    "status": "SKIP",
+    "detail": "needs sway, swaymsg, foot, not installed on this distro",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "multi-monitor: two-screen client layout -> two nested outputs (sway WLR_WL_OUTPUTS=2)",
+    "status": "SKIP",
+    "detail": "needs sway, swaymsg, foot, not installed on this distro",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "labwc session: detected, output fills the screen, clipboard both ways, resize follows",
+    "status": "SKIP",
+    "detail": "needs sway, swaymsg, foot, not installed on this distro",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "NestedCompositor=Off: sway is managed as an ordinary window (floating WM fallback)",
+    "status": "SKIP",
+    "detail": "needs sway, swaymsg, foot, not installed on this distro",
+    "artifacts": []
+  }
+]
