@@ -425,6 +425,19 @@ static void handle_output_frame(struct wl_listener* listener, void* data)
 
   clock_gettime(CLOCK_MONOTONIC, &now);
   wlr_scene_output_send_frame_done(c->scene_output, &now);
+
+  /* The scene only sends frame events to visible surfaces. A nested
+   * compositor output that is covered (several outputs on one screen)
+   * would then stop rendering, and not even draw itself at a new size
+   * once it is uncovered. Its outputs are always "on", so keep them
+   * running. */
+  {
+    struct view* v;
+    wl_list_for_each(v, &c->views, link) {
+      if (v->nested && v->mapped)
+        wlr_surface_send_frame_done(v->xdg->base->surface, &now);
+    }
+  }
 }
 
 static void handle_output_destroy(struct wl_listener* listener, void* data)
@@ -915,8 +928,12 @@ static void xdg_commit(struct wl_listener* listener, void* data)
   (void)data;
   if (!v->xdg->base->initial_commit) {
     /* The window geometry offset may change with any commit */
-    if (v->nested)
+    if (v->nested) {
       nested_position(v);
+      /* Make sure a frame event follows even if it is covered */
+      if (c->output)
+        wlr_output_schedule_frame(c->output);
+    }
     return;
   }
 
