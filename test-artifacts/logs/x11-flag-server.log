@@ -1,6 +1,6 @@
 _XSERVTransmkdir: Owner of /tmp/.X11-unix should be set to root
 
-Xvnc TigerVNC 1.16.80 - built 2026-11-10 08:36
+Xvnc TigerVNC 1.16.80 - built 2026-11-10 11:13
 Copyright (C) 1999-2026 TigerVNC team and many others (see README.rst)
 See https://www.tigervnc.org for information on TigerVNC.
 Underlying X server release 12101022
@@ -8,27 +8,27 @@ Underlying X server release 12101022
 Could not find any available render nodes
 Failed to initialize DRI3 extension
 
-Tue Nov 10 08:36:51 2026
+Tue Nov 10 11:15:36 2026
  vncext:      VNC extension running
  vncext:      Listening for VNC connections on local interfaces, port 5903
  vncext:      Created VNC server for screen 0
-[mi] mieq: warning: overriding existing handler (nil) with 0x55a380692fc0 for event 2
-[mi] mieq: warning: overriding existing handler (nil) with 0x55a380692fc0 for event 3
- Connections: Accepted: 127.0.0.1::49270
- VNCSConnST:  Closing 127.0.0.1::49270: Clean disconnection
+[mi] mieq: warning: overriding existing handler (nil) with 0x5644ffbebfc0 for event 2
+[mi] mieq: warning: overriding existing handler (nil) with 0x5644ffbebfc0 for event 3
+ Connections: Accepted: 127.0.0.1::50688
+ VNCSConnST:  Closing 127.0.0.1::50688: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total:: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::49270
- Connections: Accepted: 127.0.0.1::49284
+ Connections: Closed: 127.0.0.1::50688
+ Connections: Accepted: 127.0.0.1::50690
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VncAuth (2)
  VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
               rgb888
  VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
 
-Tue Nov 10 08:36:53 2026
- VNCSConnST:  Closing 127.0.0.1::49284: Clean disconnection
+Tue Nov 10 11:15:37 2026
+ VNCSConnST:  Closing 127.0.0.1::50690: Clean disconnection
  EncodeManager: Framebuffer updates: 1
  EncodeManager:   Raw:
  EncodeManager:     Solid: 8 rects, 480 kpixels

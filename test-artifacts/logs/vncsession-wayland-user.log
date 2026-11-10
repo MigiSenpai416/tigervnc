@@ -1,15 +1,17 @@
 Using desktop session vnc-test
 
-New '7af06f2560be:1 (vncuser)' Wayland desktop is 7af06f2560be:1
+New '27e0dbffff7e:1 (vncuser)' Wayland desktop is 27e0dbffff7e:1
 
 Starting Wayland desktop session vnc-test
 
-Tue Nov 10 08:37:39 2026
+Tue Nov 10 11:17:54 2026
  Main:        XDG_RUNTIME_DIR not set, using /tmp/runtime-1001
-
-Tue Nov 10 08:37:40 2026
+ Main:        Xwayland authority file:
+              /tmp/runtime-1001/tigervnc-wayland-1.Xauthority
  Main:        Wayland display wayland-1 created in /tmp/runtime-1001 (1024x768)
  Main:        Listening for VNC connections on local interfaces, port 5901
+ Main:        vncconfig control socket:
+              /tmp/runtime-1001/tigervnc-wayland-1.vncconfig
 Xwayland glamor: GBM Wayland interfaces not available
 Failed to initialize glamor, falling back to sw
  WaylandDesktop: Xwayland ready on DISPLAY=:0
@@ -22,13 +24,13 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::39170
- VNCSConnST:  Closing 127.0.0.1::39170: Clean disconnection
+ Connections: Accepted: 127.0.0.1::48564
+ VNCSConnST:  Closing 127.0.0.1::48564: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total:: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::39170
- Connections: Accepted: 127.0.0.1::39176
+ Connections: Closed: 127.0.0.1::48564
+ Connections: Accepted: 127.0.0.1::48578
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VeNCrypt (19)
  SVeNCrypt:   Client requests security type TLSVnc (258)
@@ -40,7 +42,3 @@ warn: wayland.c:1789: compositor does not implement server-side cursors, falling
 warn: wayland.c:1794: compositor does not implement the XDG toplevel icon protocol
 warn: wayland.c:1799: text input interface not implemented by compositor; IME will be disabled
 warn: wayland.c:2061: no decoration manager available - using CSDs unconditionally
-
-Tue Nov 10 08:37:42 2026
- VNCSConnST:  Closing 127.0.0.1::39176: Failed receiving TLS data: The TLS
-             

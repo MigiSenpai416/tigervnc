@@ -1,5 +1,7 @@
 
-Tue Nov 10 08:37:37 2026
+Tue Nov 10 11:16:21 2026
+ Main:        Xwayland authority file:
+              /tmp/wltest/xdg-runtime/tigervnc-wayland-7.Xauthority
  Main:        Wayland display wayland-7 created in /tmp/wltest/xdg-runtime
               (640x480)
  TcpSocket:   Failed to set TCP_NODELAY: 95
@@ -7,6 +9,8 @@ Tue Nov 10 08:37:37 2026
  TcpSocket:   Unknown address family
  Connections: Accepted: (N/A)::0
  TcpSocket:   Unknown address family
+ Main:        vncconfig control socket:
+              /tmp/wltest/xdg-runtime/tigervnc-wayland-7.vncconfig
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VncAuth (2)
  TcpSocket:   Unknown address family
@@ -16,7 +20,7 @@ Tue Nov 10 08:37:37 2026
 Xwayland glamor: GBM Wayland interfaces not available
 Failed to initialize glamor, falling back to sw
  WaylandDesktop: Xwayland ready on DISPLAY=:0
- Main:        Started session 'sleep' (pid 79)
+ Main:        Started session 'sleep' (pid 83)
 The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Unsupported maximum keycode 708, clipping.
 >                   X11 cannot support keycodes above 255.
@@ -26,7 +30,7 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
 
-Tue Nov 10 08:37:38 2026
+Tue Nov 10 11:16:23 2026
  Main:        Terminating
  VNCSConnST:  Closing (N/A)::0: Clean disconnection
  EncodeManager: Framebuffer updates: 1

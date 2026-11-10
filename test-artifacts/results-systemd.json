@@ -3,7 +3,7 @@
     "suite": "systemd",
     "test": "vncserver@:1.service, mode=wayland: Wayland session, logind session Type=wayland",
     "status": "PASS",
-    "detail": "systemctl start rc=0, active=active, logind sessions=[{'Name': 'vncuser', 'Service': 'tigervnc', 'Type': 'wayland', 'Class': 'user', 'State': 'active'}], session XDG_RUNTIME_DIR='/run/user/1001' WAYLAND_DISPLAY='wayland-1', foot (302, 332, 720, 512), xterm (20, 20, 322, 126)",
+    "detail": "systemctl start rc=0, active=active, logind sessions=[{'Name': 'vncuser', 'Service': 'tigervnc', 'Type': 'wayland', 'Class': 'user', 'State': 'active'}], session XDG_RUNTIME_DIR='/run/user/1001' WAYLAND_DISPLAY='wayland-1', foot (302, 332, 720, 512), xterm (20, 22, 322, 128)",
     "artifacts": [
       "/artifacts/systemd-01-wayland-unit.png"
     ]

@@ -1,0 +1,69 @@
+
+Tue Nov 10 11:17:12 2026
+ Main:        Xwayland authority file:
+              /tmp/wltest/xdg-runtime/tigervnc-wayland-12.Xauthority
+ Main:        Wayland display wayland-12 created in /tmp/wltest/xdg-runtime
+              (640x480)
+ Main:        Listening for VNC connections on local interfaces, port 5912
+ Main:        vncconfig control socket:
+              /tmp/wltest/xdg-runtime/tigervnc-wayland-12.vncconfig
+Xwayland glamor: GBM Wayland interfaces not available
+Failed to initialize glamor, falling back to sw
+ WaylandDesktop: Xwayland ready on DISPLAY=:0
+ Main:        Started session 'sh' (pid 269)
+The XKEYBOARD keymap compiler (xkbcomp) reports:
+> Warning:          Unsupported maximum keycode 708, clipping.
+>                   X11 cannot support keycodes above 255.
+> Warning:          Virtual modifier Hyper multiply defined
+>                   Using 0, ignoring 0
+> Warning:          Virtual modifier ScrollLock multiply defined
+>                   Using 0, ignoring 0
+Errors from xkbcomp are not fatal to the X server
+ Connections: Accepted: 127.0.0.1::43412
+ VNCSConnST:  Closing 127.0.0.1::43412: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::43412
+ Connections: Accepted: 127.0.0.1::43416
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth (2)
+ VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
+              rgb888
+ VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+
+Tue Nov 10 11:17:13 2026
+ ControlSocket: Parameter SendCutText changed by vncconfig
+
+Tue Nov 10 11:17:16 2026
+ ControlSocket: Parameter SendCutText changed by vncconfig
+
+Tue Nov 10 11:17:17 2026
+ ControlSocket: Parameter desktop changed by vncconfig
+ Connections: Accepted: 127.0.0.1::43420
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth (2)
+ VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
+              rgb888
+ VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Closing 127.0.0.1::43420: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::43420
+ ControlSocket: Reverse connection: 127.0.0.1:55665
+ Connections: Accepted: 127.0.0.1::55665
+ VNCSConnST:  Closing 127.0.0.1::55665: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::55665
+ Main:        Terminating
+ VNCSConnST:  Closing 127.0.0.1::43416: User requested disconnection
+ EncodeManager: Framebuffer updates: 1
+ EncodeManager:   Raw:
+ EncodeManager:     Solid: 5 rects, 307.2 kpixels
+ EncodeManager:            1.17193 MiB (1:1 ratio)
+ EncodeManager:   Total:: 5 rects, 307.2 kpixels
+ EncodeManager:          1.17193 MiB (1:1 ratio)
+ Main:        Terminated

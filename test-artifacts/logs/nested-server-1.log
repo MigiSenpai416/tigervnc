@@ -1,0 +1,61 @@
+
+Tue Nov 10 11:17:18 2026
+ Main:        Xwayland authority file:
+              /tmp/nestedtest/rt-1/tigervnc-wayland-1.Xauthority
+ Main:        Wayland display wayland-1 created in /tmp/nestedtest/rt-1
+              (1024x768)
+ Main:        Listening for VNC connections on local interfaces, port 5901
+ Main:        vncconfig control socket:
+              /tmp/nestedtest/rt-1/tigervnc-wayland-1.vncconfig
+Xwayland glamor: GBM Wayland interfaces not available
+Failed to initialize glamor, falling back to sw
+ WaylandDesktop: Xwayland ready on DISPLAY=:0
+ Main:        Started session '/tmp/nestedtest/session-1.sh' (pid 13)
+The XKEYBOARD keymap compiler (xkbcomp) reports:
+> Warning:          Unsupported maximum keycode 708, clipping.
+>                   X11 cannot support keycodes above 255.
+> Warning:          Virtual modifier Hyper multiply defined
+>                   Using 0, ignoring 0
+> Warning:          Virtual modifier ScrollLock multiply defined
+>                   Using 0, ignoring 0
+Errors from xkbcomp are not fatal to the X server
+ Connections: Accepted: 127.0.0.1::50180
+ VNCSConnST:  Closing 127.0.0.1::50180: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::50180
+
+Tue Nov 10 11:17:19 2026
+ WaylandDesktop: Client pid 13 (wlroots) is a nested compositor serving
+              /tmp/nestedtest/rt-1/wayland-2, giving it the whole screen
+ WaylandDesktop: Connecting clipboard bridge to /tmp/nestedtest/rt-1/wayland-2
+ WaylandDesktop: Clipboard bridge to nested compositor (pid 13) ready,
+              wlr-data-control v2
+ Connections: Accepted: 127.0.0.1::50188
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth (2)
+ VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
+              rgb888
+ VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+
+Tue Nov 10 11:17:30 2026
+ WaylandDesktop: Framebuffer resized to 1280x720
+ VNCSConnST:  Update request 1024x768 at 0,0 exceeds framebuffer 1280x720
+
+Tue Nov 10 11:17:33 2026
+ Main:        Terminating
+ VNCSConnST:  Closing 127.0.0.1::50188: Clean disconnection
+ EncodeManager: Framebuffer updates: 8
+ EncodeManager:   Raw:
+ EncodeManager:     Solid: 62 rects, 3.25788 Mpixels
+ EncodeManager:            12.4286 MiB (1:1 ratio)
+ EncodeManager:     Bitmap RLE: 2 rects, 1.134 kpixels
+ EncodeManager:                 4.45312 KiB (1:1 ratio)
+ EncodeManager:     Indexed RLE: 3 rects, 2.128 kpixels
+ EncodeManager:                  8.34766 KiB (1:1 ratio)
+ EncodeManager:     Full color: 20 rects, 28.718 kpixels
+ EncodeManager:                 112.414 KiB (1:1 ratio)
+ EncodeManager:   Total:: 87 rects, 3.28986 Mpixels
+ EncodeManager:          12.5508 MiB (1:1 ratio)
+ Main:        Terminated

@@ -1,0 +1,40 @@
+Using desktop session sway
+
+New '27e0dbffff7e:6 (vncuser)' Wayland desktop is 27e0dbffff7e:6
+
+Starting Wayland desktop session sway
+
+Tue Nov 10 11:18:20 2026
+ Main:        XDG_RUNTIME_DIR not set, using /tmp/runtime-1001
+ Main:        Xwayland authority file:
+              /tmp/runtime-1001/tigervnc-wayland-6.Xauthority
+ Main:        Wayland display wayland-6 created in /tmp/runtime-1001 (1024x768)
+ Main:        Listening for VNC connections on local interfaces, port 5906
+ Main:        vncconfig control socket:
+              /tmp/runtime-1001/tigervnc-wayland-6.vncconfig
+Xwayland glamor: GBM Wayland interfaces not available
+Failed to initialize glamor, falling back to sw
+ WaylandDesktop: Xwayland ready on DISPLAY=:0
+ Main:        Started session 'dbus-run-session' (pid 125)
+The XKEYBOARD keymap compiler (xkbcomp) reports:
+> Warning:          Unsupported maximum keycode 708, clipping.
+>                   X11 cannot support keycodes above 255.
+> Warning:          Virtual modifier Hyper multiply defined
+>                   Using 0, ignoring 0
+> Warning:          Virtual modifier ScrollLock multiply defined
+>                   Using 0, ignoring 0
+Errors from xkbcomp are not fatal to the X server
+ WaylandDesktop: Client pid 129 (wlroots) is a nested compositor serving
+              /tmp/runtime-1001/wayland-1, giving it the whole screen
+ WaylandDesktop: Connecting clipboard bridge to /tmp/runtime-1001/wayland-1
+ WaylandDesktop: Clipboard bridge to nested compositor (pid 129) ready,
+              wlr-data-control v2
+sh: 1: systemctl: not found
+2026-11-10 11:18:20 - [main.c:278] Could not find config for output WL-1 ((null))
+00:00:00.013 [INFO] [swaybar/tray/icon.c:339] Warning: no icon themes loaded
+ Connections: Accepted: 127.0.0.1::43314
+ VNCSConnST:  Closing 127.0.0.1::43314: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::43314
