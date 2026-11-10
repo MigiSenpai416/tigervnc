@@ -1,8 +1,7 @@
 
-Tue Nov 10 11:16:57 2026
+Tue Nov 10 12:23:58 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-10.Xauthority
-00:00:00.003 [ERROR] [xwayland/sockets.c:64] Failed to bind socket @/tmp/.X11-unix/X0: Address already in use
  Main:        Wayland display wayland-10 created in /tmp/wltest/xdg-runtime
               (640x480)
  Main:        Listening for VNC connections on local interfaces, port 5910
@@ -10,8 +9,8 @@ Tue Nov 10 11:16:57 2026
               /tmp/wltest/xdg-runtime/tigervnc-wayland-10.vncconfig
 Xwayland glamor: GBM Wayland interfaces not available
 Failed to initialize glamor, falling back to sw
- WaylandDesktop: Xwayland ready on DISPLAY=:1
- Main:        Started session 'sh' (pid 228)
+ WaylandDesktop: Xwayland ready on DISPLAY=:0
+ Main:        Started session 'sh' (pid 225)
 The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Unsupported maximum keycode 708, clipping.
 >                   X11 cannot support keycodes above 255.
@@ -20,25 +19,27 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::45630
- Connections: Accepted: 127.0.0.1::45636
- VNCSConnST:  Closing 127.0.0.1::45630: Clean disconnection
+
+Tue Nov 10 12:23:59 2026
+ Connections: Accepted: 127.0.0.1::54906
+ Connections: Accepted: 127.0.0.1::54914
+ SConnection: Client needs protocol version 3.8
+ VNCSConnST:  Closing 127.0.0.1::54906: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total:: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::45630
- SConnection: Client needs protocol version 3.8
+ Connections: Closed: 127.0.0.1::54906
  SConnection: Client requests security type VncAuth (2)
  VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
               rgb888
  VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
 
-Tue Nov 10 11:16:59 2026
+Tue Nov 10 12:24:00 2026
  WaylandDesktop: Framebuffer resized to 800x600 by a Wayland client
 
-Tue Nov 10 11:17:01 2026
+Tue Nov 10 12:24:02 2026
  Main:        Terminating
- VNCSConnST:  Closing 127.0.0.1::45636: Clean disconnection
+ VNCSConnST:  Closing 127.0.0.1::54914: Clean disconnection
  EncodeManager: Framebuffer updates: 3
  EncodeManager:   Raw:
  EncodeManager:     Solid: 18 rects, 1.0944 Mpixels

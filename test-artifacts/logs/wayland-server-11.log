@@ -1,5 +1,5 @@
 
-Tue Nov 10 11:17:01 2026
+Tue Nov 10 12:24:02 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-11.Xauthority
  Main:        Wayland display wayland-11 created in /tmp/wltest/xdg-runtime
@@ -10,7 +10,7 @@ Tue Nov 10 11:17:01 2026
 Xwayland glamor: GBM Wayland interfaces not available
 Failed to initialize glamor, falling back to sw
  WaylandDesktop: Xwayland ready on DISPLAY=:0
- Main:        Started session 'sh' (pid 246)
+ Main:        Started session 'sh' (pid 242)
 The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Unsupported maximum keycode 708, clipping.
 >                   X11 cannot support keycodes above 255.
@@ -19,35 +19,35 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::39910
- Connections: Accepted: 127.0.0.1::39926
- VNCSConnST:  Closing 127.0.0.1::39910: Clean disconnection
+ Connections: Accepted: 127.0.0.1::39228
+ Connections: Accepted: 127.0.0.1::39234
+ SConnection: Client needs protocol version 3.8
+ VNCSConnST:  Closing 127.0.0.1::39228: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total:: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::39910
- SConnection: Client needs protocol version 3.8
+ Connections: Closed: 127.0.0.1::39228
  SConnection: Client requests security type VncAuth (2)
  VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
               rgb888
  VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
-00:00:11.033 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 230, value 6291468
-00:00:11.033 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 232, value 6291468
-00:00:11.033 [ERROR] [xwayland/xwm.c:1920] xcb error: op ChangeProperty (no minor), code Window (no extension), sequence 235, value 6291468
-00:00:11.033 [ERROR] [xwayland/xwm.c:1920] xcb error: op DeleteProperty (no minor), code Window (no extension), sequence 236, value 6291468
-00:00:11.033 [ERROR] [xwayland/xwm.c:1920] xcb error: op DeleteProperty (no minor), code Window (no extension), sequence 239, value 6291468
+00:00:21.153 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 329, value 6291468
+00:00:21.153 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 331, value 6291468
+00:00:21.153 [ERROR] [xwayland/xwm.c:1920] xcb error: op ChangeProperty (no minor), code Window (no extension), sequence 334, value 6291468
+00:00:21.153 [ERROR] [xwayland/xwm.c:1920] xcb error: op DeleteProperty (no minor), code Window (no extension), sequence 335, value 6291468
+00:00:21.153 [ERROR] [xwayland/xwm.c:1920] xcb error: op DeleteProperty (no minor), code Window (no extension), sequence 338, value 6291468
 
-Tue Nov 10 11:17:12 2026
+Tue Nov 10 12:24:23 2026
  Main:        Terminating
- VNCSConnST:  Closing 127.0.0.1::39926: read: Connection reset by peer (104)
- EncodeManager: Framebuffer updates: 6
+ VNCSConnST:  Closing 127.0.0.1::39234: read: Connection reset by peer (104)
+ EncodeManager: Framebuffer updates: 10
  EncodeManager:   Raw:
- EncodeManager:     Solid: 55 rects, 1.7955 Mpixels
- EncodeManager:            6.84992 MiB (1:1 ratio)
- EncodeManager:     Bitmap RLE: 10 rects, 17.268 kpixels
- EncodeManager:                 67.5703 KiB (1:1 ratio)
- EncodeManager:     Indexed RLE: 9 rects, 16.908 kpixels
- EncodeManager:                  66.1523 KiB (1:1 ratio)
- EncodeManager:   Total:: 74 rects, 1.82968 Mpixels
- EncodeManager:          6.98051 MiB (1:1 ratio)
+ EncodeManager:     Solid: 76 rects, 2.79468 Mpixels
+ EncodeManager:            10.6617 MiB (1:1 ratio)
+ EncodeManager:     Bitmap RLE: 15 rects, 14.362 kpixels
+ EncodeManager:                 56.2773 KiB (1:1 ratio)
+ EncodeManager:     Indexed RLE: 17 rects, 26.438 kpixels
+ EncodeManager:                  103.473 KiB (1:1 ratio)
+ EncodeManager:   Total:: 108 rects, 2.83548 Mpixels
+ EncodeManager:          10.8177 MiB (1:1 ratio)
  Main:        Terminated

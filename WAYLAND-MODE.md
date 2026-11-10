@@ -131,6 +131,11 @@ Without `--wayland` or `mode=wayland`, nothing changes.
     through `_MOTIF_WM_HINTS`, override-redirect windows and fullscreen
     windows get no bar. A window whose bar would be off the top edge is
     moved down to make room.
+  * X11 windows get their initial geometry (and the zero border width
+    every wlroots WM sets) on the client's `MapRequest`, before the X
+    server maps them. Doing it after mapping made the X server
+    reallocate the window's pixmap and could lose contents drawn before
+    that, e.g. an intermittently black `xeyes` window.
   * Maximize and fullscreen requests are honoured, including requests
     that arrive between the first commit and the first map (e.g.
     `foot --fullscreen`).

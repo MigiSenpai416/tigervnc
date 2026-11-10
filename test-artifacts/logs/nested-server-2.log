@@ -1,5 +1,5 @@
 
-Tue Nov 10 11:17:33 2026
+Tue Nov 10 12:25:11 2026
  Main:        Xwayland authority file:
               /tmp/nestedtest/rt-2/tigervnc-wayland-2.Xauthority
  Main:        Wayland display wayland-2 created in /tmp/nestedtest/rt-2
@@ -24,26 +24,26 @@ Errors from xkbcomp are not fatal to the X server
  WaylandDesktop: Connecting clipboard bridge to /tmp/nestedtest/rt-2/wayland-1
  WaylandDesktop: Clipboard bridge to nested compositor (pid 52) ready,
               wlr-data-control v2
- Connections: Accepted: 127.0.0.1::42512
- Connections: Accepted: 127.0.0.1::42520
- SConnection: Client needs protocol version 3.8
- VNCSConnST:  Closing 127.0.0.1::42512: Clean disconnection
+ Connections: Accepted: 127.0.0.1::39658
+ Connections: Accepted: 127.0.0.1::39664
+ VNCSConnST:  Closing 127.0.0.1::39658: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total:: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::42512
+ Connections: Closed: 127.0.0.1::39658
+ SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VncAuth (2)
  VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
               rgb888
  VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
 
-Tue Nov 10 11:17:35 2026
+Tue Nov 10 12:25:12 2026
  WaylandDesktop: Framebuffer resized to 1600x600
  VNCSConnST:  Update request 1024x768 at 0,0 exceeds framebuffer 1600x600
 
-Tue Nov 10 11:17:37 2026
+Tue Nov 10 12:25:15 2026
  Main:        Terminating
- VNCSConnST:  Closing 127.0.0.1::42520: Clean disconnection
+ VNCSConnST:  Closing 127.0.0.1::39664: Clean disconnection
  EncodeManager: Framebuffer updates: 2
  EncodeManager:   Raw:
  EncodeManager:     Solid: 30 rects, 1.74432 Mpixels

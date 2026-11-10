@@ -322,6 +322,7 @@ struct view {
     int kind;
   } deco_parts[4];
   struct wl_listener set_title;
+  struct wl_listener map_request;
   struct wl_listener associate;
   struct wl_listener dissociate;
   struct wl_listener request_configure;
@@ -1754,6 +1755,28 @@ static void xw_map(struct wl_listener* listener, void* data)
   deco_update(v);
 }
 
+/* Called on the client's MapRequest, before the X server maps the
+ * window. Apply the final geometry (and the zero border width that
+ * wlr_xwayland_surface_configure() always sets) now rather than after
+ * mapping: changing the border width of a mapped window makes the X
+ * server reallocate its composite pixmap, and contents drawn before
+ * that (e.g. xeyes, which draws only on Expose) can be lost, leaving
+ * a black window until the client happens to redraw. */
+static void xw_map_request(struct wl_listener* listener, void* data)
+{
+  struct view* v = wl_container_of(listener, v, map_request);
+  struct wlr_xwayland_surface* xs = v->xsurface;
+  int16_t y = xs->y;
+  (void)data;
+
+  if (xs->override_redirect || xs->fullscreen ||
+      (xs->maximized_horz && xs->maximized_vert))
+    return;   /* placed by xw_map() */
+  if (view_has_deco(v) && y < DECO_HEIGHT)
+    y = DECO_HEIGHT;   /* keep the title bar on screen */
+  wlr_xwayland_surface_configure(xs, xs->x, y, xs->width, xs->height);
+}
+
 static void xw_unmap(struct wl_listener* listener, void* data)
 {
   struct view* v = wl_container_of(listener, v, unmap);
@@ -1899,6 +1922,7 @@ static void xw_destroy(struct wl_listener* listener, void* data)
   wl_list_remove(&v->request_maximize.link);
   wl_list_remove(&v->request_fullscreen.link);
   wl_list_remove(&v->set_title.link);
+  wl_list_remove(&v->map_request.link);
   wl_list_remove(&v->destroy.link);
   wl_list_remove(&v->map.link);
   wl_list_remove(&v->unmap.link);
@@ -1953,6 +1977,8 @@ static void handle_xwayland_new_surface(struct wl_listener* listener,
   wl_signal_add(&xs->events.request_fullscreen, &v->request_fullscreen);
   v->set_title.notify = xw_set_title;
   wl_signal_add(&xs->events.set_title, &v->set_title);
+  v->map_request.notify = xw_map_request;
+  wl_signal_add(&xs->events.map_request, &v->map_request);
 }
 
 static void handle_xwayland_ready(struct wl_listener* listener, void* data)

@@ -1,5 +1,5 @@
 
-Tue Nov 10 11:16:31 2026
+Tue Nov 10 12:23:33 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-5.Xauthority
  Main:        Wayland display wayland-5 created in /tmp/wltest/xdg-runtime
@@ -9,10 +9,8 @@ Tue Nov 10 11:16:31 2026
               /tmp/wltest/xdg-runtime/tigervnc-wayland-5.vncconfig
 Xwayland glamor: GBM Wayland interfaces not available
 Failed to initialize glamor, falling back to sw
-
-Tue Nov 10 11:16:32 2026
  WaylandDesktop: Xwayland ready on DISPLAY=:0
- Main:        Started session 'foot' (pid 108)
+ Main:        Started session 'foot' (pid 107)
 The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Unsupported maximum keycode 708, clipping.
 >                   X11 cannot support keycodes above 255.
@@ -26,22 +24,22 @@ warn: wayland.c:1789: compositor does not implement server-side cursors, falling
 warn: wayland.c:1794: compositor does not implement the XDG toplevel icon protocol
 warn: wayland.c:1799: text input interface not implemented by compositor; IME will be disabled
 warn: wayland.c:2061: no decoration manager available - using CSDs unconditionally
- Connections: Accepted: 127.0.0.1::59936
- Connections: Accepted: 127.0.0.1::59946
- VNCSConnST:  Closing 127.0.0.1::59936: Clean disconnection
+ Connections: Accepted: 127.0.0.1::34858
+ Connections: Accepted: 127.0.0.1::34864
+ SConnection: Client needs protocol version 3.8
+ VNCSConnST:  Closing 127.0.0.1::34858: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total:: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::59936
- SConnection: Client needs protocol version 3.8
+ Connections: Closed: 127.0.0.1::34858
  SConnection: Client requests security type VncAuth (2)
  VNCSConnST:  Server default pixel format: depth 16 (16bpp) little-endian
               rgb565
  VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
 
-Tue Nov 10 11:16:34 2026
+Tue Nov 10 12:23:36 2026
  Main:        Terminating
- VNCSConnST:  Closing 127.0.0.1::59946: Clean disconnection
+ VNCSConnST:  Closing 127.0.0.1::34864: Clean disconnection
  EncodeManager: Framebuffer updates: 1
  EncodeManager:   Raw:
  EncodeManager:     Solid: 10 rects, 302.746 kpixels
@@ -52,10 +50,10 @@ Tue Nov 10 11:16:34 2026
  EncodeManager:                 13.0547 KiB (1:1 ratio)
  EncodeManager:   Total:: 13 rects, 307.2 kpixels
  EncodeManager:          1.17202 MiB (1:1 ratio)
- Main:        Terminated
 warn: wayland.c:1652: unknown global removed: 0x00000013
  err: wayland.c:2318: failed to roundtrip Wayland display: Broken pipe
  err: wayland.c:2318: failed to roundtrip Wayland display: Broken pipe
  err: wayland.c:2318: failed to roundtrip Wayland display: Broken pipe
+ Main:        Terminated
 warn: terminal.c:2029: slave exited with signal 1 (Hangup)
  err: wayland.c:2283: failed to flush wayland socket: Broken pipe

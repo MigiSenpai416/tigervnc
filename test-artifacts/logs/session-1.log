@@ -1,4 +1,4 @@
-2026-11-10 11:17:19 - [main.c:282] Found config * for output WL-1 ((null))
+2026-11-10 12:24:56 - [main.c:282] Found config * for output WL-1 ((null))
 warn: wayland.c:1794: compositor does not implement the XDG toplevel icon protocol
  err: wayland.c:1675: failed to read events from the Wayland socket: Connection reset by peer
  err: wayland.c:2318: failed to roundtrip Wayland display: Connection reset by peer

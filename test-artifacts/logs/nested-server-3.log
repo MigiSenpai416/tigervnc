@@ -1,9 +1,7 @@
 
-Tue Nov 10 11:17:37 2026
+Tue Nov 10 12:25:15 2026
  Main:        Xwayland authority file:
               /tmp/nestedtest/rt-3/tigervnc-wayland-3.Xauthority
-
-Tue Nov 10 11:17:38 2026
  Main:        Wayland display wayland-3 created in /tmp/nestedtest/rt-3
               (1024x768)
  Main:        Listening for VNC connections on local interfaces, port 5903
@@ -26,27 +24,27 @@ Errors from xkbcomp are not fatal to the X server
  WaylandDesktop: Connecting clipboard bridge to /tmp/nestedtest/rt-3/wayland-0
  WaylandDesktop: Clipboard bridge to nested compositor (pid 83) ready,
               wlr-data-control v2
- Connections: Accepted: 127.0.0.1::53216
- Connections: Accepted: 127.0.0.1::53224
- VNCSConnST:  Closing 127.0.0.1::53216: Clean disconnection
+ Connections: Accepted: 127.0.0.1::38044
+ Connections: Accepted: 127.0.0.1::38054
+ SConnection: Client needs protocol version 3.8
+ VNCSConnST:  Closing 127.0.0.1::38044: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total:: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::53216
- SConnection: Client needs protocol version 3.8
+ Connections: Closed: 127.0.0.1::38044
  SConnection: Client requests security type VncAuth (2)
  VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
               rgb888
  VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
 
-Tue Nov 10 11:17:44 2026
+Tue Nov 10 12:25:21 2026
  WaylandDesktop: Framebuffer resized to 1280x720
 
-Tue Nov 10 11:17:45 2026
+Tue Nov 10 12:25:23 2026
  VNCSConnST:  Update request 1024x768 at 0,0 exceeds framebuffer 1280x720
 
-Tue Nov 10 11:17:47 2026
- VNCSConnST:  Closing 127.0.0.1::53224: Clean disconnection
+Tue Nov 10 12:25:24 2026
+ VNCSConnST:  Closing 127.0.0.1::38054: Clean disconnection
  EncodeManager: Framebuffer updates: 2
  EncodeManager:   Raw:
  EncodeManager:     Solid: 78 rects, 1.64828 Mpixels
@@ -59,6 +57,6 @@ Tue Nov 10 11:17:47 2026
  EncodeManager:                 22.0469 KiB (1:1 ratio)
  EncodeManager:   Total:: 89 rects, 1.70803 Mpixels
  EncodeManager:          6.51664 MiB (1:1 ratio)
- Connections: Closed: 127.0.0.1::53224
+ Connections: Closed: 127.0.0.1::38054
  Main:        Terminating
  Main:        Terminated

@@ -1,6 +1,6 @@
 _XSERVTransmkdir: ERROR: euid != 0,directory /tmp/.X11-unix will not be created.
 
-Xvnc TigerVNC 1.16.80 - built 2026-11-10 11:13
+Xvnc TigerVNC 1.16.80 - built 2026-11-10 12:22
 Copyright (C) 1999-2026 TigerVNC team and many others (see README.rst)
 See https://www.tigervnc.org for information on TigerVNC.
 Underlying X server release 12101022
@@ -8,63 +8,65 @@ Underlying X server release 12101022
 Could not find any available render nodes
 Failed to initialize DRI3 extension
 
-Tue Nov 10 11:15:22 2026
+Tue Nov 10 12:22:23 2026
  vncext:      VNC extension running
  vncext:      Listening for VNC connections on local interfaces, port 5902
  vncext:      Created VNC server for screen 0
-[mi] mieq: warning: overriding existing handler (nil) with 0x56190d0b8fc0 for event 2
-[mi] mieq: warning: overriding existing handler (nil) with 0x56190d0b8fc0 for event 3
- Connections: Accepted: 127.0.0.1::42512
- VNCSConnST:  Closing 127.0.0.1::42512: Clean disconnection
+[mi] mieq: warning: overriding existing handler (nil) with 0x5607094f6fc0 for event 2
+[mi] mieq: warning: overriding existing handler (nil) with 0x5607094f6fc0 for event 3
+ Connections: Accepted: 127.0.0.1::45380
+ VNCSConnST:  Closing 127.0.0.1::45380: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total:: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::42512
- Connections: Accepted: 127.0.0.1::42528
+ Connections: Closed: 127.0.0.1::45380
+ Connections: Accepted: 127.0.0.1::45382
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VncAuth (2)
  VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
               rgb888
  VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
- Connections: Accepted: 127.0.0.1::42540
- VNCSConnST:  Closing 127.0.0.1::42528: Clean disconnection
+ Connections: Accepted: 127.0.0.1::45386
+ VNCSConnST:  Closing 127.0.0.1::45382: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total:: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::42528
+ Connections: Closed: 127.0.0.1::45382
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VncAuth (2)
  SConnection: Authentication error: Authentication failed
- VNCSConnST:  Closing 127.0.0.1::42540: Authentication failed
+
+Tue Nov 10 12:22:24 2026
+ VNCSConnST:  Closing 127.0.0.1::45386: Authentication failed
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total:: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::42540
- Connections: Accepted: 127.0.0.1::42546
+ Connections: Closed: 127.0.0.1::45386
+ Connections: Accepted: 127.0.0.1::45396
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VeNCrypt (19)
  SVeNCrypt:   Client requests security type X509Vnc (261)
  VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
               rgb888
  VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
- Connections: Accepted: 127.0.0.1::42554
- VNCSConnST:  Closing 127.0.0.1::42546: Failed receiving TLS data: The TLS
+ VNCSConnST:  Closing 127.0.0.1::45396: Failed receiving TLS data: The TLS
               connection was non-properly terminated. (-110)
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total:: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::42546
+ Connections: Closed: 127.0.0.1::45396
+ Connections: Accepted: 127.0.0.1::45400
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VncAuth (2)
  VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
               rgb888
  VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
 
-Tue Nov 10 11:15:33 2026
+Tue Nov 10 12:22:34 2026
  VNCSConnST:  Update request 1024x768 at 0,0 exceeds framebuffer 1280x720
 
-Tue Nov 10 11:15:36 2026
- VNCSConnST:  Closing 127.0.0.1::42554: Clean disconnection
+Tue Nov 10 12:22:37 2026
+ VNCSConnST:  Closing 127.0.0.1::45400: Clean disconnection
  EncodeManager: Framebuffer updates: 8
  EncodeManager:   Raw:
  EncodeManager:     Solid: 105 rects, 3.9386 Mpixels
@@ -77,4 +79,4 @@ Tue Nov 10 11:15:36 2026
  EncodeManager:                 32.4453 KiB (1:1 ratio)
  EncodeManager:   Total:: 151 rects, 4.01926 Mpixels
  EncodeManager:          15.334 MiB (1:1 ratio)
- Connections: Closed: 127.0.0.1::42554
+ Connections: Closed: 127.0.0.1::45400

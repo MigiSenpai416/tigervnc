@@ -4,7 +4,7 @@ Xvnc: Warning: X server option '-fp' has no effect in Wayland mode, ignored
 Xvnc: Warning: X server option '-noreset' has no effect in Wayland mode, ignored
 Xvnc: Warning: X server option '-pn' has no effect in Wayland mode, ignored
 
-Tue Nov 10 11:16:34 2026
+Tue Nov 10 12:23:36 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-6.Xauthority
  Main:        Wayland display wayland-6 created in /tmp/wltest/xdg-runtime
@@ -15,7 +15,7 @@ Tue Nov 10 11:16:34 2026
 Xwayland glamor: GBM Wayland interfaces not available
 Failed to initialize glamor, falling back to sw
  WaylandDesktop: Xwayland ready on DISPLAY=:0
- Main:        Started session 'sleep' (pid 136)
+ Main:        Started session 'sleep' (pid 135)
 The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Unsupported maximum keycode 708, clipping.
 >                   X11 cannot support keycodes above 255.
@@ -24,9 +24,9 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::59876
+ Connections: Accepted: 127.0.0.1::53708
  Main:        Terminating
- VNCSConnST:  Closing 127.0.0.1::59876: The server is shutting down
+ VNCSConnST:  Closing 127.0.0.1::53708: The server is shutting down
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total:: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
