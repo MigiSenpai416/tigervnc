@@ -142,6 +142,7 @@ ENC_RAW = 0
 ENC_DESKTOP_SIZE = -223
 ENC_LAST_RECT = -224
 ENC_EXT_DESKTOP_SIZE = -308
+ENC_LED_STATE = -261
 
 XK_SHIFT_L = 0xffe1
 XK_RETURN = 0xff0d
@@ -160,7 +161,7 @@ class RFBError(Exception):
 class RFBClient:
     def __init__(self, host="127.0.0.1", port=5900, security="VncAuth",
                  password=None, username=None, timeout=10.0,
-                 unix_path=None, sock=None):
+                 unix_path=None, sock=None, led_state=False):
         self.log = []
         if sock is not None:
             self.sock = sock
@@ -175,6 +176,7 @@ class RFBClient:
         self.cut_texts = []
         self.bells = 0
         self.ext_desktop_size = []   # (reason, status, w, h, screens)
+        self._led_state = led_state
         self._handshake(security, password, username)
 
     # -- low level
@@ -248,6 +250,10 @@ class RFBClient:
                          16, 8, 0)
         self._send(struct.pack(">B3x", 0) + pf)
         encs = [ENC_RAW, ENC_DESKTOP_SIZE, ENC_EXT_DESKTOP_SIZE, ENC_LAST_RECT]
+        self.leds = None
+        if self._led_state:
+            # the server then leaves lock key state to the client
+            encs.append(ENC_LED_STATE)
         self._send(struct.pack(">BxH", 2, len(encs)) +
                    b"".join(struct.pack(">i", e) for e in encs))
 
@@ -403,6 +409,8 @@ class RFBClient:
                 self.ext_desktop_size.append((x, y, w, h, screens))
                 if y == 0:
                     self._resize_fb(w, h)
+            elif enc == ENC_LED_STATE:
+                self.leds = self._u8()
             elif enc == ENC_LAST_RECT:
                 break
             else:

@@ -60,6 +60,9 @@ struct wvnc_callbacks {
   void (*xwayland_ready)(void* data, const char* display);
   /* Informational message for the server log */
   void (*info)(void* data, const char* msg);
+  /* A Wayland client (wlr-output-management) asks for a new output
+   * size. Return true if the framebuffer was resized. */
+  bool (*output_resize)(void* data, int width, int height);
 };
 
 /* Logs through the info callback of the (only) compositor */
@@ -114,8 +117,11 @@ bool wvnc_resize(struct wvnc_compositor* c, int width, int height);
 /* Input */
 void wvnc_pointer_event(struct wvnc_compositor* c, int x, int y,
                         uint16_t button_mask);
+/* Report the current lock key LEDs through the leds callback */
+void wvnc_sync_leds(struct wvnc_compositor* c);
 void wvnc_key_event(struct wvnc_compositor* c, uint32_t keysym,
-                    uint32_t qnum, bool down, bool raw_keyboard);
+                    uint32_t qnum, bool down, bool raw_keyboard,
+                    bool avoid_shift_numlock);
 
 /* Clipboard */
 void wvnc_set_vnc_selection(struct wvnc_compositor* c, bool available,

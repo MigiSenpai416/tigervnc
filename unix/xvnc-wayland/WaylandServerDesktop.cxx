@@ -73,6 +73,7 @@ WaylandServerDesktop::WaylandServerDesktop(int width, int height,
   cb.leds = cbLeds;
   cb.xwayland_ready = cbXwaylandReady;
   cb.info = cbInfo;
+  cb.output_resize = cbOutputResize;
 
   comp = wvnc_compositor_create(&opts, &cb);
   if (comp)
@@ -124,6 +125,9 @@ void WaylandServerDesktop::init(rfb::VNCServer* vs)
   server->setPixelBuffer(pb);
   // The default layout is a single screen covering the framebuffer
   wvnc_set_screens(comp, nullptr, 0);
+  // Without a known LED state the server ignores lock keys and skips
+  // its NumLock/CapsLock synchronisation, so report it from the start
+  wvnc_sync_leds(comp);
 }
 
 void WaylandServerDesktop::setScreens(const rfb::ScreenSet& layout)
@@ -177,7 +181,8 @@ unsigned int WaylandServerDesktop::setScreenLayout(int fb_width,
 void WaylandServerDesktop::keyEvent(uint32_t keysym, uint32_t keycode,
                                     bool down)
 {
-  wvnc_key_event(comp, keysym, keycode, down, rawKeyboard);
+  wvnc_key_event(comp, keysym, keycode, down, rawKeyboard,
+                 avoidShiftNumLock);
 }
 
 void WaylandServerDesktop::pointerEvent(const core::Point& pos,
@@ -311,4 +316,26 @@ void WaylandServerDesktop::cbXwaylandReady(void* data, const char* display)
 void WaylandServerDesktop::cbInfo(void* /*data*/, const char* msg)
 {
   vlog.info("%s", msg);
+}
+
+bool WaylandServerDesktop::cbOutputResize(void* data, int width, int height)
+{
+  WaylandServerDesktop* self = (WaylandServerDesktop*)data;
+  rfb::PixelBuffer* oldpb;
+
+  if (!wvnc_resize(self->comp, width, height))
+    return false;
+
+  // Like a resize through xrandr in Xvnc: the layout becomes a single
+  // screen and all viewers are told about the new size
+  oldpb = self->pb;
+  self->pb = self->createPixelBuffer();
+  if (self->server)
+    self->server->setPixelBuffer(self->pb);
+  delete oldpb;
+  wvnc_set_screens(self->comp, nullptr, 0);
+
+  vlog.info(_("Framebuffer resized to %dx%d by a Wayland client"),
+            width, height);
+  return true;
 }

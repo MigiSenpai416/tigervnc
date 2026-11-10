@@ -92,6 +92,9 @@
 #include <xcb/xcb.h>
 #endif
 
+#include <wlr/types/wlr_output_management_v1.h>
+#include <wlr/util/box.h>
+
 #include "compositor.h"
 #include "nested_bridge.h"
 
@@ -257,6 +260,11 @@ struct wvnc_compositor {
   struct wl_listener xwayland_ready;
   struct wl_listener xwayland_new_surface;
 #endif
+
+  /* wlr-output-management */
+  struct wlr_output_manager_v1* output_manager;
+  struct wl_listener output_manager_apply;
+  struct wl_listener output_manager_test;
 
   /* Nested compositor support */
   enum wvnc_nested_mode nested_mode;
@@ -450,6 +458,8 @@ static void handle_output_destroy(struct wl_listener* listener, void* data)
   c->scene_output = NULL;
 }
 
+static void update_output_manager(struct wvnc_compositor* c);
+
 static void handle_new_output(struct wl_listener* listener, void* data)
 {
   struct wvnc_compositor* c = wl_container_of(listener, c, new_output);
@@ -482,6 +492,7 @@ static void handle_new_output(struct wl_listener* listener, void* data)
   c->scene_output = wlr_scene_output_create(c->scene, output);
   wlr_scene_output_layout_add_output(c->scene_layout, lo, c->scene_output);
   c->full_damage = true;
+  update_output_manager(c);
 }
 
 uint8_t* wvnc_framebuffer(struct wvnc_compositor* c, int* width,
@@ -626,11 +637,130 @@ static void focus_next_view(struct wvnc_compositor* c)
   focus_surface(c, NULL);
 }
 
+/* Screens (from the viewer's layout) ------------------------------- */
+
+/* The screen containing a point, or the nearest one */
+static struct wlr_box screen_at(struct wvnc_compositor* c, int x, int y)
+{
+  struct wlr_box full = { 0, 0, c->width, c->height };
+  int best = -1;
+  double best_d = 0;
+
+  for (int i = 0; i < c->num_screens; i++) {
+    struct wlr_box* b = &c->screens[i];
+    double cx, cy, d;
+    if (wlr_box_contains_point(b, x, y))
+      return *b;
+    wlr_box_closest_point(b, x, y, &cx, &cy);
+    d = (cx - x) * (cx - x) + (cy - y) * (cy - y);
+    if (best < 0 || d < best_d) {
+      best = i;
+      best_d = d;
+    }
+  }
+  return best < 0 ? full : c->screens[best];
+}
+
+/* The part of a screen not taken by panels (layer-shell exclusive
+ * zones) */
+static struct wlr_box usable_in(struct wvnc_compositor* c,
+                                struct wlr_box screen)
+{
+  struct wlr_box r;
+  if (!wlr_box_intersection(&r, &screen, &c->usable_area))
+    return screen;
+  return r;
+}
+
+static struct wlr_box view_screen(struct view* v)
+{
+  struct wlr_box box;
+  view_get_box(v, &box);
+  return screen_at(v->c, box.x + box.width / 2, box.y + box.height / 2);
+}
+
+/* wlr-output-management ---------------------------------------------- */
+
+static void update_output_manager(struct wvnc_compositor* c)
+{
+  struct wlr_output_configuration_v1* config;
+  if (!c->output_manager || !c->output)
+    return;
+  config = wlr_output_configuration_v1_create();
+  if (!config)
+    return;
+  wlr_output_configuration_head_v1_create(config, c->output);
+  wlr_output_manager_v1_set_configuration(c->output_manager, config);
+}
+
+/* Only the size of our one output can be changed */
+static bool check_output_config(struct wvnc_compositor* c,
+                                struct wlr_output_configuration_v1* config,
+                                int* width, int* height)
+{
+  struct wlr_output_configuration_head_v1* head;
+  bool found = false;
+
+  wl_list_for_each(head, &config->heads, link) {
+    struct wlr_output_head_v1_state* st = &head->state;
+    if (st->output != c->output || !st->enabled)
+      return false;
+    if (st->x != 0 || st->y != 0 || st->scale != 1.0f ||
+        st->transform != WL_OUTPUT_TRANSFORM_NORMAL)
+      return false;
+    if (st->mode) {
+      *width = st->mode->width;
+      *height = st->mode->height;
+    } else {
+      *width = st->custom_mode.width;
+      *height = st->custom_mode.height;
+    }
+    if (*width < 1 || *height < 1 || *width > 16384 || *height > 16384)
+      return false;
+    found = true;
+  }
+  return found;
+}
+
+static void handle_output_manager_test(struct wl_listener* listener,
+                                       void* data)
+{
+  struct wvnc_compositor* c =
+    wl_container_of(listener, c, output_manager_test);
+  struct wlr_output_configuration_v1* config = data;
+  int w, h;
+  if (check_output_config(c, config, &w, &h))
+    wlr_output_configuration_v1_send_succeeded(config);
+  else
+    wlr_output_configuration_v1_send_failed(config);
+  wlr_output_configuration_v1_destroy(config);
+}
+
+static void handle_output_manager_apply(struct wl_listener* listener,
+                                        void* data)
+{
+  struct wvnc_compositor* c =
+    wl_container_of(listener, c, output_manager_apply);
+  struct wlr_output_configuration_v1* config = data;
+  int w, h;
+  bool ok = check_output_config(c, config, &w, &h);
+  if (ok && (w != c->width || h != c->height))
+    ok = c->cb.output_resize && c->cb.output_resize(c->cb.data, w, h);
+  if (ok)
+    wlr_output_configuration_v1_send_succeeded(config);
+  else
+    wlr_output_configuration_v1_send_failed(config);
+  wlr_output_configuration_v1_destroy(config);
+  update_output_manager(c);
+}
+
 static void view_place(struct view* v)
 {
   struct wvnc_compositor* c = v->c;
   struct wlr_box box;
-  struct wlr_box* area = &c->usable_area;
+  /* New windows open on the screen with the pointer */
+  struct wlr_box screen_area = usable_in(c, screen_at(c, c->px, c->py));
+  struct wlr_box* area = &screen_area;
 
   view_get_box(v, &box);
   box.x = area->x + (area->width - box.width) / 2 + c->cascade;
@@ -650,7 +780,11 @@ static void view_maximize(struct view* v, bool maximize, bool fullscreen)
 {
   struct wvnc_compositor* c = v->c;
   bool was = v->maximized || v->fullscreen;
-  struct wlr_box full = { 0, 0, c->width, c->height };
+  /* Maximize/fullscreen on the screen the window is on */
+  struct wlr_box full = was && v->saved.width > 0 ?
+    screen_at(c, v->saved.x + v->saved.width / 2,
+              v->saved.y + v->saved.height / 2) : view_screen(v);
+  struct wlr_box area = usable_in(c, full);
 
   if (maximize || fullscreen) {
     if (!was)
@@ -677,7 +811,7 @@ static void view_maximize(struct view* v, bool maximize, bool fullscreen)
   if (v->fullscreen)
     view_set_box(v, &full);
   else if (v->maximized)
-    view_set_box(v, &c->usable_area);
+    view_set_box(v, &area);
   else if (was && v->saved.width > 0 && v->saved.height > 0)
     view_set_box(v, &v->saved);
   else if (was && v->owner.type == OWNER_XDG)
@@ -821,6 +955,8 @@ static void nested_view_gone(struct view* v)
   c->bridge = NULL;
 }
 
+static void rearrange_views(struct wvnc_compositor* c);
+
 void wvnc_set_screens(struct wvnc_compositor* c, const struct wvnc_box* boxes,
                       int n)
 {
@@ -840,7 +976,7 @@ void wvnc_set_screens(struct wvnc_compositor* c, const struct wvnc_box* boxes,
   if (c->num_screens == 1 && c->screens[0].x == 0 && c->screens[0].y == 0 &&
       c->screens[0].width == c->width && c->screens[0].height == c->height)
     c->num_screens = 0;
-  arrange_nested(c);
+  rearrange_views(c); /* includes arrange_nested() */
 }
 
 static void rearrange_views(struct wvnc_compositor* c)
@@ -921,6 +1057,28 @@ static void xdg_unmap(struct wl_listener* listener, void* data)
     arrange_nested(c);
 }
 
+/* Size and state of a toplevel before it maps: maximized/fullscreen
+ * windows open on the screen with the pointer */
+static void xdg_initial_state(struct view* v)
+{
+  struct wvnc_compositor* c = v->c;
+  if (v->xdg->requested.fullscreen || v->xdg->requested.maximized) {
+    struct wlr_box full = screen_at(c, c->px, c->py);
+    struct wlr_box area = usable_in(c, full);
+    struct wlr_box* b;
+    v->saved = (struct wlr_box){ 0, 0, 0, 0 };
+    v->fullscreen = v->xdg->requested.fullscreen;
+    v->maximized = !v->fullscreen && v->xdg->requested.maximized;
+    b = v->fullscreen ? &full : &area;
+    wlr_xdg_toplevel_set_maximized(v->xdg, v->maximized);
+    wlr_xdg_toplevel_set_fullscreen(v->xdg, v->fullscreen);
+    wlr_xdg_toplevel_set_size(v->xdg, b->width, b->height);
+    wlr_scene_node_set_position(&v->scene_tree->node, b->x, b->y);
+  } else {
+    wlr_xdg_toplevel_set_size(v->xdg, 0, 0);
+  }
+}
+
 static void xdg_commit(struct wl_listener* listener, void* data)
 {
   struct view* v = wl_container_of(listener, v, commit);
@@ -951,20 +1109,7 @@ static void xdg_commit(struct wl_listener* listener, void* data)
     WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN);
   wlr_xdg_toplevel_set_bounds(v->xdg, c->usable_area.width,
                               c->usable_area.height);
-  if (v->xdg->requested.fullscreen || v->xdg->requested.maximized) {
-    struct wlr_box full = { 0, 0, c->width, c->height };
-    struct wlr_box* b;
-    v->saved = (struct wlr_box){ 0, 0, 0, 0 };
-    v->fullscreen = v->xdg->requested.fullscreen;
-    v->maximized = !v->fullscreen && v->xdg->requested.maximized;
-    b = v->fullscreen ? &full : &c->usable_area;
-    wlr_xdg_toplevel_set_maximized(v->xdg, v->maximized);
-    wlr_xdg_toplevel_set_fullscreen(v->xdg, v->fullscreen);
-    wlr_xdg_toplevel_set_size(v->xdg, b->width, b->height);
-    wlr_scene_node_set_position(&v->scene_tree->node, b->x, b->y);
-  } else {
-    wlr_xdg_toplevel_set_size(v->xdg, 0, 0);
-  }
+  xdg_initial_state(v);
 }
 
 static void xdg_destroy(struct wl_listener* listener, void* data)
@@ -1032,6 +1177,8 @@ static void xdg_request_maximize(struct wl_listener* listener, void* data)
     arrange_nested(v->c); /* always a whole screen */
   else if (v->mapped)
     view_maximize(v, v->xdg->requested.maximized, v->fullscreen);
+  else
+    xdg_initial_state(v); /* asked for after the initial commit */
   wlr_xdg_surface_schedule_configure(v->xdg->base);
 }
 
@@ -1045,6 +1192,8 @@ static void xdg_request_fullscreen(struct wl_listener* listener, void* data)
     arrange_nested(v->c);
   else if (v->mapped)
     view_maximize(v, v->maximized, v->xdg->requested.fullscreen);
+  else
+    xdg_initial_state(v); /* asked for after the initial commit */
   wlr_xdg_surface_schedule_configure(v->xdg->base);
 }
 
@@ -1981,40 +2130,66 @@ static xkb_keycode_t find_keysym_current(struct wvnc_compositor* c,
   return XKB_KEYCODE_INVALID;
 }
 
-/* Find a keycode and the modifier mask producing sym at any level */
+/*
+ * Find a keycode and the Shift/AltGr state producing sym. Only Shift
+ * and AltGr (Mod5) can be faked; the other modifiers (NumLock, Caps
+ * Lock, held Ctrl, ...) stay as they are, so each candidate is tried
+ * on a scratch copy of the real state. Candidates that change fewer
+ * modifiers come first.
+ */
 static xkb_keycode_t find_keysym_any(struct wvnc_compositor* c,
                                      xkb_keysym_t sym, xkb_mod_mask_t* mods)
 {
   struct xkb_keymap* map = c->keyboard.keymap;
   struct xkb_state* state = c->keyboard.xkb_state;
+  struct xkb_state* scratch;
+  xkb_mod_mask_t shift = 0, l3 = 0, fakeable, depressed, cur;
+  xkb_mod_index_t idx;
+  xkb_keycode_t found = XKB_KEYCODE_INVALID;
+
   if (!map)
     return XKB_KEYCODE_INVALID;
-  for (xkb_keycode_t kc = xkb_keymap_min_keycode(map);
-       kc <= xkb_keymap_max_keycode(map); kc++) {
-    xkb_layout_index_t layout = xkb_state_key_get_layout(state, kc);
-    if (layout == XKB_LAYOUT_INVALID)
-      continue;
-    xkb_level_index_t levels = xkb_keymap_num_levels_for_key(map, kc, layout);
-    for (xkb_level_index_t lvl = 0; lvl < levels; lvl++) {
-      const xkb_keysym_t* syms;
-      int n = xkb_keymap_key_get_syms_by_level(map, kc, layout, lvl, &syms);
-      if (n != 1 || syms[0] != sym)
+  idx = xkb_keymap_mod_get_index(map, XKB_MOD_NAME_SHIFT);
+  if (idx != XKB_MOD_INVALID)
+    shift = 1u << idx;
+  idx = xkb_keymap_mod_get_index(map, "Mod5");
+  if (idx != XKB_MOD_INVALID)
+    l3 = 1u << idx;
+  fakeable = shift | l3;
+  depressed = xkb_state_serialize_mods(state, XKB_STATE_MODS_DEPRESSED);
+  cur = depressed & fakeable;
+
+  scratch = xkb_state_new(map);
+  if (!scratch)
+    return XKB_KEYCODE_INVALID;
+
+  xkb_mod_mask_t combos[4] = { 0, shift, l3, shift | l3 };
+  for (int changes = 0; changes <= 2 && found == XKB_KEYCODE_INVALID;
+       changes++) {
+    for (int i = 0; i < 4 && found == XKB_KEYCODE_INVALID; i++) {
+      xkb_mod_mask_t combo = combos[i];
+      if ((combo & ~fakeable) || __builtin_popcount(combo ^ cur) != changes)
         continue;
-      xkb_mod_mask_t masks[8];
-      size_t nm = xkb_keymap_key_get_mods_for_level(map, kc, layout, lvl,
-                                                    masks, 8);
-      if (nm == 0)
-        continue;
-      /* Prefer the simplest mask */
-      xkb_mod_mask_t best = masks[0];
-      for (size_t i = 1; i < nm; i++)
-        if (__builtin_popcount(masks[i]) < __builtin_popcount(best))
-          best = masks[i];
-      *mods = best;
-      return kc;
+      if (i > 0 && combo == combos[0])
+        continue;   /* modifier missing from the keymap */
+      xkb_state_update_mask(scratch, (depressed & ~fakeable) | combo,
+        xkb_state_serialize_mods(state, XKB_STATE_MODS_LATCHED),
+        xkb_state_serialize_mods(state, XKB_STATE_MODS_LOCKED),
+        xkb_state_serialize_layout(state, XKB_STATE_LAYOUT_DEPRESSED),
+        xkb_state_serialize_layout(state, XKB_STATE_LAYOUT_LATCHED),
+        xkb_state_serialize_layout(state, XKB_STATE_LAYOUT_LOCKED));
+      for (xkb_keycode_t kc = xkb_keymap_min_keycode(map);
+           kc <= xkb_keymap_max_keycode(map); kc++) {
+        if (xkb_state_key_get_one_sym(scratch, kc) == sym) {
+          found = kc;
+          *mods = combo;
+          break;
+        }
+      }
     }
   }
-  return XKB_KEYCODE_INVALID;
+  xkb_state_unref(scratch);
+  return found;
 }
 
 static void update_leds(struct wvnc_compositor* c)
@@ -2036,6 +2211,12 @@ static void update_leds(struct wvnc_compositor* c)
   }
 }
 
+void wvnc_sync_leds(struct wvnc_compositor* c)
+{
+  c->leds = ~0u;   /* report even if nothing is lit */
+  update_leds(c);
+}
+
 static xkb_keycode_t qnum_to_keycode(uint32_t qnum)
 {
   if (qnum == 0 || qnum >= code_map_qnum_to_xorgevdev_len)
@@ -2045,8 +2226,62 @@ static xkb_keycode_t qnum_to_keycode(uint32_t qnum)
   return code_map_qnum_to_xorgevdev[qnum];
 }
 
+/* Keypad keys: the ones NumLock (or a fake Shift) switches */
+static bool key_is_keypad(struct wvnc_compositor* c, xkb_keycode_t kc)
+{
+  struct xkb_keymap* map = c->keyboard.keymap;
+  int levels = xkb_keymap_num_levels_for_key(map, kc, 0);
+  for (int l = 0; l < levels; l++) {
+    const xkb_keysym_t* syms;
+    int n = xkb_keymap_key_get_syms_by_level(map, kc, 0, l, &syms);
+    for (int i = 0; i < n; i++)
+      if (syms[i] >= XKB_KEY_KP_Space && syms[i] <= XKB_KEY_KP_9)
+        return true;
+  }
+  return false;
+}
+
+/* Same pairs as Xvnc's altKeysym table (keypad part) */
+static const struct { xkb_keysym_t kp, plain; } keypad_alt[] = {
+  { XKB_KEY_KP_Space, XKB_KEY_space }, { XKB_KEY_KP_Tab, XKB_KEY_Tab },
+  { XKB_KEY_KP_Enter, XKB_KEY_Return }, { XKB_KEY_KP_F1, XKB_KEY_F1 },
+  { XKB_KEY_KP_F2, XKB_KEY_F2 }, { XKB_KEY_KP_F3, XKB_KEY_F3 },
+  { XKB_KEY_KP_F4, XKB_KEY_F4 }, { XKB_KEY_KP_Home, XKB_KEY_Home },
+  { XKB_KEY_KP_Left, XKB_KEY_Left }, { XKB_KEY_KP_Up, XKB_KEY_Up },
+  { XKB_KEY_KP_Right, XKB_KEY_Right }, { XKB_KEY_KP_Down, XKB_KEY_Down },
+  { XKB_KEY_KP_Page_Up, XKB_KEY_Page_Up },
+  { XKB_KEY_KP_Page_Down, XKB_KEY_Page_Down },
+  { XKB_KEY_KP_End, XKB_KEY_End }, { XKB_KEY_KP_Begin, XKB_KEY_Begin },
+  { XKB_KEY_KP_Insert, XKB_KEY_Insert },
+  { XKB_KEY_KP_Delete, XKB_KEY_Delete },
+  { XKB_KEY_KP_Equal, XKB_KEY_equal },
+  { XKB_KEY_KP_Multiply, XKB_KEY_asterisk },
+  { XKB_KEY_KP_Add, XKB_KEY_plus },
+  { XKB_KEY_KP_Separator, XKB_KEY_comma },
+  { XKB_KEY_KP_Subtract, XKB_KEY_minus },
+  { XKB_KEY_KP_Decimal, XKB_KEY_period },
+  { XKB_KEY_KP_Divide, XKB_KEY_slash },
+  { XKB_KEY_KP_0, XKB_KEY_0 }, { XKB_KEY_KP_1, XKB_KEY_1 },
+  { XKB_KEY_KP_2, XKB_KEY_2 }, { XKB_KEY_KP_3, XKB_KEY_3 },
+  { XKB_KEY_KP_4, XKB_KEY_4 }, { XKB_KEY_KP_5, XKB_KEY_5 },
+  { XKB_KEY_KP_6, XKB_KEY_6 }, { XKB_KEY_KP_7, XKB_KEY_7 },
+  { XKB_KEY_KP_8, XKB_KEY_8 }, { XKB_KEY_KP_9, XKB_KEY_9 },
+};
+
+static bool shift_change_needed(struct wvnc_compositor* c,
+                                xkb_mod_mask_t mods)
+{
+  xkb_mod_index_t shift = xkb_keymap_mod_get_index(c->keyboard.keymap,
+                                                   XKB_MOD_NAME_SHIFT);
+  xkb_mod_mask_t active = xkb_state_serialize_mods(c->keyboard.xkb_state,
+                                                   XKB_STATE_MODS_DEPRESSED);
+  if (shift == XKB_MOD_INVALID)
+    return false;
+  return ((mods ^ active) & (1u << shift)) != 0;
+}
+
 void wvnc_key_event(struct wvnc_compositor* c, uint32_t keysym,
-                    uint32_t qnum, bool down, bool raw)
+                    uint32_t qnum, bool down, bool raw, bool avoid_numlock)
 {
   uint32_t id = qnum ? (0x80000000u | qnum) : keysym;
   xkb_keycode_t kc = XKB_KEYCODE_INVALID;
@@ -2081,6 +2316,54 @@ void wvnc_key_event(struct wvnc_compositor* c, uint32_t keysym,
   if (kc == XKB_KEYCODE_INVALID) {
     kc = find_keysym_any(c, keysym, &mods);
     fake_mods = (kc != XKB_KEYCODE_INVALID);
+  }
+
+  /*
+   * Like Xvnc: a fake Shift on a keypad key acts like NumLock in X11
+   * but confuses applications elsewhere, so use the equivalent key
+   * outside the keypad if there is one.
+   */
+  if (fake_mods && avoid_numlock && shift_change_needed(c, mods) &&
+      key_is_keypad(c, kc)) {
+    for (size_t i = 0; i < sizeof(keypad_alt) / sizeof(keypad_alt[0]); i++) {
+      xkb_keysym_t alt;
+      xkb_keycode_t kc2;
+      xkb_mod_mask_t mods2 = 0;
+      if (keypad_alt[i].kp == keysym)
+        alt = keypad_alt[i].plain;
+      else if (keypad_alt[i].plain == keysym)
+        alt = keypad_alt[i].kp;
+      else
+        continue;
+      kc2 = find_keysym_current(c, alt);
+      if (kc2 != XKB_KEYCODE_INVALID) {
+        kc = kc2;
+        fake_mods = false;
+        break;
+      }
+      kc2 = find_keysym_any(c, alt, &mods2);
+      if (kc2 == XKB_KEYCODE_INVALID ||
+          (shift_change_needed(c, mods2) && key_is_keypad(c, kc2)))
+        continue;
+      kc = kc2;
+      mods = mods2;
+      break;
+    }
+  }
+
+  /* A keypad keysym that needs a NumLock state we cannot fake (e.g.
+   * XK_KP_4 with NumLock off): the plain key is closer than nothing */
+  if (kc == XKB_KEYCODE_INVALID) {
+    for (size_t i = 0; i < sizeof(keypad_alt) / sizeof(keypad_alt[0]); i++) {
+      if (keypad_alt[i].kp != keysym)
+        continue;
+      kc = find_keysym_current(c, keypad_alt[i].plain);
+      if (kc == XKB_KEYCODE_INVALID) {
+        kc = find_keysym_any(c, keypad_alt[i].plain, &mods);
+        fake_mods = (kc != XKB_KEYCODE_INVALID);
+      }
+      break;
+    }
   }
 
   if (kc == XKB_KEYCODE_INVALID) {
@@ -2628,6 +2911,11 @@ struct wvnc_compositor* wvnc_compositor_create(const struct wvnc_options* opts,
   wlr_screencopy_manager_v1_create(c->display);
 
   c->output_layout = wlr_output_layout_create(c->display);
+  c->output_manager = wlr_output_manager_v1_create(c->display);
+  c->output_manager_apply.notify = handle_output_manager_apply;
+  wl_signal_add(&c->output_manager->events.apply, &c->output_manager_apply);
+  c->output_manager_test.notify = handle_output_manager_test;
+  wl_signal_add(&c->output_manager->events.test, &c->output_manager_test);
   wlr_xdg_output_manager_v1_create(c->display, c->output_layout);
 
   c->scene = wlr_scene_create();
@@ -2777,6 +3065,8 @@ void wvnc_compositor_destroy(struct wvnc_compositor* c)
 
     /* wlroots asserts that nobody listens any more when its objects
      * go away */
+    remove_listener(&c->output_manager_apply);
+    remove_listener(&c->output_manager_test);
     remove_listener(&c->new_xdg_toplevel);
     remove_listener(&c->new_xdg_popup);
     remove_listener(&c->new_layer_surface);
@@ -2871,9 +3161,13 @@ bool wvnc_resize(struct wvnc_compositor* c, int width, int height)
   c->full_damage = true;
 
   wlr_scene_rect_set_size(c->background, width, height);
+  /* The old screen layout may not fit any more; the caller sets the
+   * new one with wvnc_set_screens() */
+  c->num_screens = 0;
   arrange_layers(c);
   rearrange_views(c);
   wlr_output_schedule_frame(c->output);
+  update_output_manager(c);
 
   return true;
 }

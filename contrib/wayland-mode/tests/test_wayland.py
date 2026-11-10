@@ -631,4 +631,217 @@ def t_ignored_x_options():
 
 s.run("X-only options (-dpi -ac -fp -noreset -pn) are ignored with a "
       "warning instead of refused", t_ignored_x_options)
+def small_session(num):
+    """Session that saves its environment, for starting apps in it."""
+    envf = os.path.join(WORK, "session-%d.env" % num)
+    if os.path.exists(envf):
+        os.unlink(envf)
+    return envf, ["sh", "-c", "env > %s.tmp && mv %s.tmp %s; "
+                  "exec sleep infinity" % (envf, envf, envf)]
+
+
+def small_app_env(envf):
+    if not wait_file(envf, 20):
+        return None
+    env = read_env_file(envf)
+    e = dict(base_env)
+    for k in ("WAYLAND_DISPLAY", "DISPLAY", "XAUTHORITY"):
+        if k in env:
+            e[k] = env[k]
+    return e
+
+
+def near(a, b, tol=4):
+    return a is not None and b is not None and \
+        all(abs(x - y) <= tol for x, y in zip(a, b))
+
+
+def xev_keys(num, extra):
+    """Keypad keysyms that need a modifier change; returns the key
+    presses an X11 app saw."""
+    import subprocess
+    envf, sess = small_session(num)
+    p = start_small(num, extra, sess)
+    xev_log = s.artifact("logs/xev-%d.txt" % num)
+    try:
+        wait_tcp(5900 + num, timeout=20)
+        env = small_app_env(envf)
+        xev = subprocess.Popen(["stdbuf", "-oL", "xev", "-event", "keyboard", "-geometry",
+                                "300x200+0+0"], env=env,
+                               stdout=open(xev_log, "w"),
+                               stderr=subprocess.STDOUT)
+        # a viewer with LED state support, like vncviewer: the server
+        # then does not insert its own NumLock/CapsLock sync presses
+        c = RFBClient(port=5900 + num, security="VncAuth",
+                      password=PASSWORD, led_state=True)
+        time.sleep(3)
+        c.click(100, 100)
+        time.sleep(0.5)
+        c.tap(0xffb4)       # XK_KP_4 with NumLock off
+        time.sleep(0.3)
+        c.tap(0xff7f)       # Num_Lock on
+        time.sleep(0.3)
+        c.request_update(True)  # LED state comes with an update
+        c.pump(0.5)
+        leds_on = c.leds
+        c.tap(0xff96)       # XK_KP_Left with NumLock on: needs Shift
+        time.sleep(0.3)
+        c.tap(0xff7f)       # Num_Lock off again
+        time.sleep(1)
+        c.close()
+        xev.terminate()
+        xev.wait(5)
+    finally:
+        os.killpg(p.pid, 15)
+        p.wait(10)
+    import re
+    out = open(xev_log).read()
+    presses = re.findall(r"KeyPress event.*?\n.*?\n\s+state 0x[0-9a-f]+, "
+                         r"keycode (\d+) \(keysym 0x[0-9a-f]+, (\w+)\)", out)
+    return presses, leds_on
+
+
+def t_avoid_shift_numlock():
+    on, leds = xev_keys(7, [])
+    off, _ = xev_keys(8, ["-AvoidShiftNumLock=0"])
+    nl = ("77", "Num_Lock")
+    want_on = [("13", "4"), nl, ("113", "Left"), nl]
+    want_off = [("13", "4"), nl, ("50", "Shift_L"), ("83", "KP_Left"), nl]
+    # ledNumLock is bit 1 of the LED state pseudo-encoding
+    ok = on == want_on and off == want_off and leds is not None and \
+        (leds & 2) != 0
+    return ok, ("XK_KP_4 (NumLock off), Num_Lock, XK_KP_Left (NumLock "
+                "on), Num_Lock: default -> X11 key presses %r (want %r: "
+                "the arrow key instead of a fake Shift); "
+                "-AvoidShiftNumLock=0 -> %r (want %r: fake Shift + keypad "
+                "key, like Xvnc); LED state after Num_Lock %r" %
+                (on, want_on, off, want_off, leds))
+
+
+s.run("AvoidShiftNumLock: no fake Shift on keypad keys (xev); keypad "
+      "keysyms unreachable without NumLock use the plain key",
+      t_avoid_shift_numlock)
+
+
+def t_multiscreen_wm():
+    import subprocess
+    envf, sess = small_session(9)
+    p = start_small(9, ["-geometry", "1600x600"], sess)
+    shots = []
+    try:
+        wait_tcp(5909, timeout=20)
+        env = small_app_env(envf)
+        c = RFBClient(port=5909, security="VncAuth", password=PASSWORD)
+        c.set_desktop_size(1600, 600, [(1, 0, 0, 800, 600, 0),
+                                       (2, 800, 0, 800, 600, 0)])
+        c.pump(1)
+        # pointer on the right screen: fullscreen foot opens there
+        c.pointer(1200, 300)
+        time.sleep(0.3)
+        f1 = subprocess.Popen(["foot", "-F"], env=env)
+        box_fs = None
+        end = time.time() + 15
+        while time.time() < end:
+            time.sleep(1)
+            c.refresh()
+            box_fs = find_colour_bbox(c, FOOT_BG, min_run=300)
+            if near(box_fs, (800, 0, 1598, 598)):
+                break
+        shots.append(c.screenshot(s.artifact(
+            "wayland-13-two-screens-fullscreen-right.png")))
+        f1.terminate()
+        f1.wait(5)
+        time.sleep(1)
+        # pointer on the left screen: maximized foot opens there
+        c.pointer(300, 300)
+        time.sleep(0.3)
+        f2 = subprocess.Popen(["foot", "-m"], env=env)
+        box_max = None
+        end = time.time() + 15
+        while time.time() < end:
+            time.sleep(1)
+            c.refresh()
+            box_max = find_colour_bbox(c, FOOT_BG, min_run=300)
+            if box_max and box_max[2] < 800 and box_max[2] > 700:
+                break
+        shots.append(c.screenshot(s.artifact(
+            "wayland-14-two-screens-maximized-left.png")))
+        f2.terminate()
+        f2.wait(5)
+        # an X11 window on the right screen maximizes on that screen
+        # an X11 window placed on the right screen goes fullscreen
+        # (xterm -fullscreen asks with _NET_WM_STATE) on that screen only
+        xt = subprocess.Popen(["xterm", "-bg", "white", "-geometry",
+                               "40x10+900+100", "-fullscreen"], env=env)
+        box_x = None
+        end = time.time() + 10
+        while time.time() < end:
+            time.sleep(1)
+            c.refresh()
+            box_x = find_colour_bbox(c, (255, 255, 255), min_run=300)
+            if near(box_x, (800, 0, 1598, 598), 6):
+                break
+        shots.append(c.screenshot(s.artifact(
+            "wayland-15-two-screens-xterm-fullscreen-right.png")))
+        xt.terminate()
+        c.close()
+    finally:
+        os.killpg(p.pid, 15)
+        p.wait(10)
+    # foot -m: client-side decorations (title bar) take some of the
+    # height, so only the horizontal extent is exact
+    ok = near(box_fs, (800, 0, 1598, 598)) and box_max is not None and \
+        box_max[0] <= 4 and 700 < box_max[2] < 800 and \
+        near(box_x, (800, 0, 1598, 598), 6)
+    return ok, ("screens 0+0 800x600 and 800+0 800x600: fullscreen foot "
+                "(pointer right) %r; maximized foot (pointer left) %r; "
+                "xterm -fullscreen at +900+100 %r" % (box_fs, box_max,
+                                                     box_x)), shots
+
+
+s.run("built-in WM with two screens: windows open, maximize and go "
+      "fullscreen on one screen (Wayland and X11)", t_multiscreen_wm)
+
+
+def t_output_management():
+    import re
+    envf, sess = small_session(10)
+    p = start_small(10, [], sess)
+    try:
+        wait_tcp(5910, timeout=20)
+        env = small_app_env(envf)
+        c = RFBClient(port=5910, security="VncAuth", password=PASSWORD)
+        c.refresh()
+        rc0, before = sh(["wlr-randr"], env=env)
+        out_name = before.split()[0] if before.split() else "?"
+        rc1, err1 = sh(["wlr-randr", "--output", out_name,
+                        "--custom-mode", "800x600"], env=env)
+        end = time.time() + 5
+        while time.time() < end and (c.width, c.height) != (800, 600):
+            c.request_update(True)
+            c.pump(0.3)
+        rc2, after = sh(["wlr-randr"], env=env)
+        rc3, err3 = sh(["wlr-randr", "--output", out_name,
+                        "--scale", "2"], env=env)
+        rc4, xd = sh("xdpyinfo | grep dimensions", env=env)
+        c.refresh()
+        shot = c.screenshot(s.artifact("wayland-16-wlr-randr-800x600.png"))
+        size = (c.width, c.height)
+        c.close()
+    finally:
+        os.killpg(p.pid, 15)
+        p.wait(10)
+    cur = re.search(r"(\d+)x(\d+) px[^\n]*current", after)
+    cur = (int(cur.group(1)), int(cur.group(2))) if cur else None
+    ok = rc1 == 0 and size == (800, 600) and cur == (800, 600) and \
+        rc3 != 0 and "800x600" in xd
+    return ok, ("wlr-randr --custom-mode 800x600 rc=%d -> viewer %dx%d, "
+                "wlr-randr current %r, Xwayland %r; --scale 2 rejected "
+                "rc=%d %r" % (rc1, size[0], size[1], cur, xd.strip(), rc3,
+                              err3.strip()[-80:])), [shot]
+
+
+s.run("wlr-output-management: wlr-randr --custom-mode resizes the "
+      "desktop for all viewers; unsupported changes are refused",
+      t_output_management)
 sys.exit(s.finish())
