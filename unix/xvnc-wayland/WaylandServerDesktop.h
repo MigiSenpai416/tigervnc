@@ -57,7 +57,8 @@ public:
 
   // rfb::SDesktop
   void init(rfb::VNCServer* vs) override;
-  void queryConnection(rfb::SConnection* conn) override;
+  void queryConnection(network::Socket* sock,
+                       const char* userName) override;
   void terminate() override;
   unsigned int setScreenLayout(int fb_width, int fb_height,
                                const rfb::ScreenSet& layout) override;
@@ -95,7 +96,7 @@ private:
   bool xReady;
 
   ControlSocket* control;
-  rfb::SConnection* pendingQuery;
+  network::Socket* pendingQuery;
   uint32_t pendingQueryId;
   uint32_t lastQueryId;
   core::MethodTimer<WaylandServerDesktop> queryConnectTimer;

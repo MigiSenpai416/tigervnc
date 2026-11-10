@@ -81,7 +81,7 @@ if(WLROOTS_FOUND AND WVNC_XCB_FOUND)
   endif()
 endif()
 
-target_link_libraries(Xvnc-wayland PRIVATE rfbserver rfb network rdr core)
+target_link_libraries(Xvnc-wayland PRIVATE rfb network rdr core)
 target_link_libraries(Xvnc-wayland PRIVATE
   PkgConfig::WLROOTS
   PkgConfig::WAYLANDSERVER

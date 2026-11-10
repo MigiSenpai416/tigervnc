@@ -57,7 +57,7 @@
 #include <core/Logger_syslog.h>
 #include <core/LogWriter.h>
 #include <core/Timer.h>
-#include <core/i18n.h>
+#include "i18n.h"
 
 #include <rdr/FdOutStream.h>
 
@@ -577,11 +577,7 @@ int main(int argc, char** argv)
         vlog.info(_("Listening for VNC connections on inetd socket"));
       } else {
         network::Socket* sock = new network::TcpSocket(inetdSock);
-        if (!server.addSocket(sock)) {
-          delete sock;
-          throw std::runtime_error(_("Failed to listen for VNC "
-                                     "connections on inetd socket"));
-        }
+        server.addSocket(sock);
       }
     }
 
@@ -717,7 +713,7 @@ int main(int argc, char** argv)
       server.getSockets(&sockets);
       for (auto i = sockets.begin(); i != sockets.end(); ) {
         network::Socket* sock = *i;
-        if (sock->isShutdownRead()) {
+        if (sock->isShutdown()) {
           int fd = sock->getFd();
           server.removeSocket(sock);
           delete sock;
@@ -769,8 +765,7 @@ int main(int argc, char** argv)
         if (fds[idx++].revents & POLLIN) {
           network::Socket* sock = listener->accept();
           if (sock) {
-            if (!server.addSocket(sock))
-              delete sock;
+            server.addSocket(sock);
           } else {
             vlog.info(_("Client connection rejected"));
           }

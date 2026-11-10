@@ -26,7 +26,7 @@
 
 #include <vector>
 
-#include <core/i18n.h>
+#include "i18n.h"
 
 #include "parameters.h"
 

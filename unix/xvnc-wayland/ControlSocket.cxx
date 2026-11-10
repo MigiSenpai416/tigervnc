@@ -35,7 +35,7 @@
 
 #include <core/Configuration.h>
 #include <core/LogWriter.h>
-#include <core/i18n.h>
+#include "i18n.h"
 #include <network/TcpSocket.h>
 #include <rfb/VNCServerST.h>
 
@@ -162,13 +162,13 @@ std::string ControlSocket::handle(const std::string& request)
 
   if (cmd == "list") {
     std::string out = "OK\n";
-    for (core::Parameter* p : *core::Configuration::global())
+    for (core::VoidParameter* p : *core::Configuration::global())
       out += std::string(p->getName()) + "\n";
     return out;
   }
 
   if (cmd == "get" || cmd == "desc") {
-    core::Parameter* p = core::Configuration::getParam(arg.c_str());
+    core::VoidParameter* p = core::Configuration::getParam(arg.c_str());
     // Like the VNC extension: never hand out the password
     if (!p || (cmd == "get" && strcasecmp(arg.c_str(), "Password") == 0))
       return "ERR " + std::string(_("No such parameter")) + "\n";
@@ -216,12 +216,8 @@ std::string ControlSocket::handle(const std::string& request)
     network::Socket* sock = new network::TcpSocket(host.c_str(), port);
     vlog.info(_("Reverse connection: %s:%d%s"), host.c_str(), port,
               viewOnly ? _(" (view only)") : "");
-    if (!server->addSocket(sock, true, viewOnly ? rfb::AccessView :
-                                                  rfb::AccessDefault)) {
-      delete sock;
-      return "ERR " + std::string(_("Failed to add reverse connection "
-                                    "socket")) + "\n";
-    }
+    server->addSocket(sock, true, viewOnly ? rfb::AccessView :
+                                             rfb::AccessDefault);
     return "OK\n";
   }
 

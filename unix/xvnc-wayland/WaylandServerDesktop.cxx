@@ -31,7 +31,7 @@
 #include <core/LogWriter.h>
 #include <core/Region.h>
 #include <core/string.h>
-#include <core/i18n.h>
+#include "i18n.h"
 
 #include <rfb/PixelFormat.h>
 #include <rfb/ScreenSet.h>
@@ -159,16 +159,16 @@ void WaylandServerDesktop::setScreens(const rfb::ScreenSet& layout)
 // Same logic and messages as XserverDesktop::queryConnection(), with
 // the control socket's "watch" connections (vncconfig) in place of the
 // VNC extension's QueryConnect event clients
-void WaylandServerDesktop::queryConnection(rfb::SConnection* conn)
+void WaylandServerDesktop::queryConnection(network::Socket* sock,
+                                           const char* user)
 {
   if (queryConnectTimer.isStarted()) {
-    server->approveConnection(conn, false,
+    server->approveConnection(sock, false,
                               _("Another connection is currently being "
                                 "queried."));
     return;
   }
 
-  const char* user = conn->getUserName();
   if (!user || user[0] == '\0')
     user = _("(anonymous)");
   uint32_t id = ++lastQueryId;
@@ -178,16 +178,16 @@ void WaylandServerDesktop::queryConnection(rfb::SConnection* conn)
   int count = 0;
   if (control)
     count = control->notifyQueryConnect(id, queryConnectTimeout,
-                                        conn->getSock()->getPeerAddress(),
+                                        sock->getPeerAddress(),
                                         user);
   if (count == 0) {
-    server->approveConnection(conn, false,
+    server->approveConnection(sock, false,
                               _("Unable to query the local user to "
                                 "accept the connection."));
     return;
   }
 
-  pendingQuery = conn;
+  pendingQuery = sock;
   pendingQueryId = id;
   queryConnectTimer.start(queryConnectTimeout * 1000);
 }
@@ -202,8 +202,8 @@ void WaylandServerDesktop::approveConnection(uint32_t id, bool accept,
   std::list<network::Socket*> sockets;
   bool valid = false;
   server->getSockets(&sockets);
-  for (network::Socket* sock : sockets)
-    if (server->getConnection(sock) == pendingQuery)
+  for (network::Socket* s : sockets)
+    if (s == pendingQuery)
       valid = true;
 
   if (valid)
@@ -215,7 +215,7 @@ void WaylandServerDesktop::approveConnection(uint32_t id, bool accept,
 
 void WaylandServerDesktop::queryTimeout(core::Timer*)
 {
-  rfb::SConnection* conn = pendingQuery;
+  network::Socket* conn = pendingQuery;
   pendingQuery = nullptr;
   pendingQueryId = 0;
   if (!conn)
@@ -223,8 +223,8 @@ void WaylandServerDesktop::queryTimeout(core::Timer*)
   std::list<network::Socket*> sockets;
   server->getSockets(&sockets);
   for (network::Socket* sock : sockets)
-    if (server->getConnection(sock) == conn)
-      server->approveConnection(conn, false,
+    if (sock == conn)
+      server->approveConnection(sock, false,
                                 _("The attempt to prompt the user to "
                                   "accept the connection failed"));
 }
