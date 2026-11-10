@@ -717,7 +717,7 @@ def xev_keys(num, extra):
 
 def keypad_shift_cancels_numlock(env, num):
     """Whether the live keymap (dumped from Xwayland with xkbcomp) lets
-    Shift cancel NumLock on the keypad (type KEYPAD maps Shift+NumLock).
+    Shift cancel NumLock on the keypad (type KEYPAD uses Shift).
     xkeyboard-config >= 2.47 dropped that mapping (Shift no longer
     reaches KP_Left etc. with NumLock on), and stock Xvnc then falls
     back to the plain arrow key even with -AvoidShiftNumLock=0."""
@@ -732,7 +732,10 @@ def keypad_shift_cancels_numlock(env, num):
     m = re.search(r'type "KEYPAD" \{(.*?)\};', text, re.S)
     if not m:
         return None
-    return re.search(r"map\[Shift\+NumLock\]", m.group(1)) is not None
+    # xkbcomp leaves out map[...] = Level1 entries, so look at the type's
+    # modifiers: with Shift among them, Shift+NumLock is Level1 (KP_Left)
+    mods = re.search(r"modifiers\s*=\s*([^;]*);", m.group(1))
+    return mods is not None and "Shift" in mods.group(1).split("+")
 
 
 def t_avoid_shift_numlock():
@@ -748,7 +751,7 @@ def t_avoid_shift_numlock():
         # xkeyboard-config >= 2.47: no Shift level reaches KP_Left with
         # NumLock on, so Xvnc (same data) sends the plain arrow key too
         want_off = want_on
-        why = ("keymap has no Shift+NumLock keypad level (xkeyboard-config "
+        why = ("keymap KEYPAD type ignores Shift (xkeyboard-config "
                ">= 2.47): plain arrow key, like Xvnc with this data")
     # ledNumLock is bit 1 of the LED state pseudo-encoding
     ok = shift_cancels is not None and on == want_on and \
@@ -757,7 +760,7 @@ def t_avoid_shift_numlock():
                 "on), Num_Lock: default -> X11 key presses %r (want %r: "
                 "the arrow key instead of a fake Shift); "
                 "-AvoidShiftNumLock=0 -> %r (want %r: %s); keymap KEYPAD "
-                "Shift+NumLock level: %r; LED state after Num_Lock %r" %
+                "type uses Shift: %r; LED state after Num_Lock %r" %
                 (on, want_on, off, want_off, why, shift_cancels, leds))
 
 
