@@ -53,6 +53,7 @@ add_executable(Xvnc-wayland
   ${DATA_CONTROL_HEADER}
   ${DATA_CONTROL_CODE}
   compositor.c
+  ControlSocket.cxx
   nested_bridge.c
   WaylandServerDesktop.cxx
   parameters.cxx

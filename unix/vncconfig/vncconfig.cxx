@@ -33,6 +33,10 @@
 #include <errno.h>
 
 #include <signal.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <string>
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -44,6 +48,12 @@
 #include <core/Exception.h>
 #include <core/Logger_stdio.h>
 #include <core/LogWriter.h>
+#include <core/string.h>
+
+/* vncconfig in 1.16 is not translated */
+#ifndef _
+#define _(String) (String)
+#endif
 
 #include "TXWindow.h"
 #include "TXCheckbox.h"
@@ -196,6 +206,159 @@ static void usage()
   exit(1);
 }
 
+// Wayland mode ("Xvnc --wayland") has no VNC X extension; the server
+// listens on $XDG_RUNTIME_DIR/<WAYLAND_DISPLAY>.vncconfig instead.
+
+static std::string waylandControlPath()
+{
+  const char* wd = getenv("WAYLAND_DISPLAY");
+  const char* rt = getenv("XDG_RUNTIME_DIR");
+  std::string path;
+  struct stat st;
+
+  if (!wd || !*wd)
+    return "";
+  if (wd[0] == '/')
+    path = wd;
+  else if (rt && *rt)
+    path = std::string(rt) + "/" + wd;
+  else
+    return "";
+  path += ".vncconfig";
+  if (stat(path.c_str(), &st) != 0 || !S_ISSOCK(st.st_mode))
+    return "";
+  return path;
+}
+
+// Sends one request; returns false on failure (message printed)
+static bool waylandRequest(const std::string& path, const std::string& req,
+                           std::string* result)
+{
+  struct sockaddr_un addr;
+  int s = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+  if (s < 0 || path.size() >= sizeof(addr.sun_path)) {
+    if (s >= 0)
+      close(s);
+    return false;
+  }
+  memset(&addr, 0, sizeof(addr));
+  addr.sun_family = AF_UNIX;
+  strcpy(addr.sun_path, path.c_str());
+  if (connect(s, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    fprintf(stderr, _("%s: Cannot connect to %s: %s\n"), programName,
+            path.c_str(), strerror(errno));
+    close(s);
+    return false;
+  }
+  std::string line = req + "\n";
+  if (write(s, line.data(), line.size()) != (ssize_t)line.size()) {
+    close(s);
+    return false;
+  }
+  std::string reply;
+  char buf[4096];
+  ssize_t n;
+  while ((n = read(s, buf, sizeof(buf))) > 0)
+    reply.append(buf, n);
+  close(s);
+
+  size_t nl = reply.find('\n');
+  std::string status = reply.substr(0, nl);
+  std::string rest = nl == std::string::npos ? "" : reply.substr(nl + 1);
+  if (status != "OK") {
+    if (status.compare(0, 4, "ERR ") == 0)
+      fprintf(stderr, "%s: %s\n", programName, status.c_str() + 4);
+    return false;
+  }
+  if (result)
+    *result = rest;
+  return true;
+}
+
+static int waylandMain(const std::string& path, int argc, char** argv,
+                       int i)
+{
+  std::string out;
+  int ret = 0;
+
+  if (i >= argc) {
+    // The server handles the clipboard itself; there is no window to
+    // show and no QueryConnect support in Wayland mode
+    vlog.info(_("Wayland mode: the server handles the clipboard; nothing "
+                "to do without options"));
+    return 0;
+  }
+
+  for (; i < argc; i++) {
+    std::string req;
+    std::string failMsg;
+    bool print = false;
+
+    if (strcmp(argv[i], "-connect") == 0) {
+      i++;
+      req = "connect ";
+      if (i < argc && strcmp(argv[i], "-view-only") == 0) {
+        req += "-view-only ";
+        i++;
+      }
+      if (i >= argc) usage();
+      req += argv[i];
+      failMsg = core::format(_("%s: Connecting to %s failed"),
+                             programName, argv[i]);
+    } else if (strcmp(argv[i], "-disconnect") == 0) {
+      req = "disconnect";
+      failMsg = core::format(_("%s: Disconnecting all clients failed"),
+                             programName);
+    } else if (strcmp(argv[i], "-get") == 0 ||
+               strcmp(argv[i], "-desc") == 0) {
+      bool get = strcmp(argv[i], "-get") == 0;
+      i++;
+      if (i >= argc) usage();
+      req = std::string(get ? "get " : "desc ") + argv[i];
+      if (get)
+        failMsg = core::format(
+          _("%s: Getting the value of parameter %s failed"),
+          programName, argv[i]);
+      else
+        failMsg = core::format(
+          _("%s: Getting the description for parameter %s failed"),
+          programName, argv[i]);
+      print = true;
+    } else if (strcmp(argv[i], "-list") == 0) {
+      req = "list";
+      failMsg = core::format(_("%s: Listing parameters failed"),
+                             programName);
+      print = true;
+    } else {
+      if (strcmp(argv[i], "-set") == 0) {
+        i++;
+        if (i >= argc) usage();
+      } else if (argv[i][0] == '-') {
+        fprintf(stderr, _("%s: Unrecognized option '%s'\n"),
+                programName, argv[i]);
+        exit(1);
+      }
+      if (!strchr(argv[i], '=')) {
+        fprintf(stderr, _("%s: Invalid parameter syntax '%s'\n"),
+                programName, argv[i]);
+        exit(1);
+      }
+      req = std::string("set ") + argv[i];
+      failMsg = core::format(_("%s: Setting the parameter %s failed"),
+                             programName, argv[i]);
+    }
+
+    if (waylandRequest(path, req, &out)) {
+      if (print)
+        fputs(out.c_str(), stdout);
+    } else {
+      fprintf(stderr, "%s\n", failMsg.c_str());
+      ret = 1;
+    }
+  }
+  return ret;
+}
+
 void removeArgs(int* argc, char** argv, int first, int n)
 {
   if (first + n > *argc) return;
@@ -234,7 +397,19 @@ int main(int argc, char** argv)
     break;
   }
 
-  if (!(dpy = XOpenDisplay(displayname))) {
+  dpy = XOpenDisplay(displayname);
+  if (!dpy || !XVncExtQueryExtension(dpy, &vncExtEventBase,
+                                     &vncExtErrorBase)) {
+    // Wayland mode: Xwayland has no VNC extension
+    std::string ctl = waylandControlPath();
+    if (!ctl.empty()) {
+      if (dpy)
+        XCloseDisplay(dpy);
+      return waylandMain(ctl, argc, argv, i);
+    }
+  }
+
+  if (!dpy) {
     fprintf(stderr,"%s: unable to open display \"%s\"\n",
             programName, XDisplayName(displayname));
     exit(1);

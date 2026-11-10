@@ -935,4 +935,118 @@ def t_x11_title_bars():
 
 s.run("X11 title bars: drawn on X11 windows, drag moves, maximize/"
       "restore and close buttons work", t_x11_title_bars)
+def t_vncconfig():
+    import subprocess, stat
+    envf, sess = small_session(12)
+    p = start_small(12, ["-desktop", "before"], sess)
+    notes, ok = [], True
+
+    def vc(*args):
+        rc, out = sh(["sh", "-c", "vncconfig \"$@\" 2>&1", "vncconfig"] +
+                     list(args), env=env)
+        return rc, out.strip()
+
+    def check(cond, note):
+        nonlocal ok
+        ok = ok and bool(cond)
+        notes.append(("" if cond else "FAILED: ") + note)
+
+    try:
+        wait_tcp(5912, timeout=20)
+        env = small_app_env(envf)
+        sock = os.path.join(runtime, "wayland-12.vncconfig")
+        mode = stat.S_IMODE(os.stat(sock).st_mode) if os.path.exists(sock) \
+            else None
+        # only the owner may connect (the server checks the peer uid too)
+        check(mode is not None and mode & 0o077 == 0,
+              "control socket %s mode %s" %
+              (sock, oct(mode) if mode is not None else None))
+
+        rc, out = vc("-list")
+        check(rc == 0 and "SendCutText" in out.split() and
+              "AllowOverride" in out.split(),
+              "-list rc=%d, %d names" % (rc, len(out.split())))
+        rc, out = vc("-get", "SendCutText")
+        check(rc == 0 and out == "on", "-get SendCutText -> %r" % out)
+        rc, out = vc("-get", "Password")
+        check(rc != 0, "-get Password refused (rc=%d %r)" % (rc, out))
+        rc, out = vc("-desc", "SendCutText")
+        check(rc == 0 and len(out) > 10, "-desc SendCutText -> %r" % out)
+
+        c = RFBClient(port=5912, security="VncAuth", password=PASSWORD)
+        c.refresh()
+        rc, out = vc("-set", "SendCutText=0")
+        rc2, out2 = vc("-get", "SendCutText")
+        check(rc == 0 and out2 == "off", "-set SendCutText=0 rc=%d, now %r" %
+              (rc, out2))
+        c.cut_texts.clear()
+        cp = subprocess.Popen(["wl-copy", "--foreground", "not-sent-1"],
+                              env=env)
+        got = c.wait_cut_text(3)
+        cp.terminate()
+        check(got is None, "with SendCutText=0 the viewer got %r" % got)
+        rc, out = vc("SendCutText=1")        # bare form, like vncconfig
+        c.cut_texts.clear()
+        cp = subprocess.Popen(["wl-copy", "--foreground", "sent-2"], env=env)
+        got = c.wait_cut_text(5)
+        cp.terminate()
+        check(rc == 0 and got == "sent-2",
+              "SendCutText=1 rc=%d, then the viewer got %r" % (rc, got))
+
+        rc, out = vc("-set", "desktop=after-rename")
+        c2 = RFBClient(port=5912, security="VncAuth", password=PASSWORD)
+        check(rc == 0 and c2.name == "after-rename",
+              "-set desktop=after-rename rc=%d, new viewer sees %r" %
+              (rc, c2.name))
+        c2.close()
+
+        rc, out = vc("-set", "rfbport=1")
+        check(rc != 0 and "AllowOverride" in out,
+              "-set rfbport=1 refused (rc=%d %r)" % (rc, out))
+
+        rc, out = vc("-disconnect")
+        gone = False
+        try:
+            c.pump(2)
+            c.request_update(True)
+            c.pump(1)
+        except Exception:
+            gone = True
+        check(rc == 0 and gone, "-disconnect rc=%d, viewer disconnected=%s"
+              % (rc, gone))
+
+        # reverse connection to a listening viewer
+        lsock = socket.socket()
+        lsock.bind(("127.0.0.1", 0))
+        lsock.listen(1)
+        lport = lsock.getsockname()[1]
+        rc, out = vc("-connect", "127.0.0.1:%d" % lport)
+        lsock.settimeout(5)
+        try:
+            conn, _ = lsock.accept()
+            conn.settimeout(5)
+            banner = conn.recv(12)
+            conn.close()
+        except Exception as e:
+            banner = repr(e).encode()
+        lsock.close()
+        check(rc == 0 and banner.startswith(b"RFB 003.008"),
+              "-connect 127.0.0.1:%d rc=%d, listening viewer got %r" %
+              (lport, rc, banner))
+
+        rc, out = vc("-nowin")
+        check(rc == 0, "vncconfig -nowin (as in xstartup files) rc=%d %r" %
+              (rc, out))
+    except Exception as e:
+        ok = False
+        notes.append("error: %r" % e)
+    finally:
+        os.killpg(p.pid, 15)
+        p.wait(10)
+    return ok, "; ".join(notes)
+
+
+s.run("vncconfig works in Wayland mode (control socket): -list -get "
+      "-desc -set/AllowOverride, desktop rename, -disconnect, -connect",
+      t_vncconfig)
 sys.exit(s.finish())

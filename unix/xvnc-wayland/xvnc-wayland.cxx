@@ -46,6 +46,7 @@
 #include <unistd.h>
 
 #include <list>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -67,6 +68,7 @@
 #include <network/UnixSocket.h>
 
 #include "WaylandServerDesktop.h"
+#include "ControlSocket.h"
 #include "parameters.h"
 
 static core::LogWriter vlog("Main");
@@ -622,6 +624,18 @@ int main(int argc, char** argv)
     // Children (session, and anything started from it) talk to us
     setenv("WAYLAND_DISPLAY", desktop.socketName(), 1);
 
+    // vncconfig's way in (instead of the VNC X extension)
+    std::unique_ptr<ControlSocket> control;
+    try {
+      control.reset(new ControlSocket(std::string(getenv("XDG_RUNTIME_DIR")) +
+                                      "/" + desktop.socketName() +
+                                      ".vncconfig", &server));
+      vlog.info(_("vncconfig control socket: %s"),
+                control->getPath().c_str());
+    } catch (std::exception& e) {
+      vlog.error(_("No vncconfig control socket: %s"), e.what());
+    }
+
     bool sessionPending = !sessionCmd.empty();
     pid_t sessionPid = -1;
     struct timespec startTime;
@@ -681,6 +695,7 @@ int main(int argc, char** argv)
 
       fds.push_back({ desktop.eventFd(), POLLIN, 0 });
       fds.push_back({ signalPipe[0], POLLIN, 0 });
+      fds.push_back({ control ? control->getFd() : -1, POLLIN, 0 });
       for (network::SocketListener* listener : listeners)
         fds.push_back({ listener->getFd(), POLLIN, 0 });
 
@@ -729,7 +744,10 @@ int main(int argc, char** argv)
       // Wayland clients, Xwayland, frame timers, clipboard pipes
       desktop.dispatch();
 
-      size_t idx = 2;
+      if (control && (fds[2].revents & POLLIN))
+        control->accept();
+
+      size_t idx = 3;
       for (network::SocketListener* listener : listeners) {
         if (fds[idx++].revents & POLLIN) {
           network::Socket* sock = listener->accept();
