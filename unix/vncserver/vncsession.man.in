@@ -66,6 +66,18 @@ The special option
 can be used to control which session type will be started. This should match
 one of the files in \fI/usr/share/xsessions\fP. E.g. if there is a file called
 "gnome.desktop", then "session=gnome" would be set to use that session type.
+
+The special option
+.B mode
+selects between an X11 session (\fBmode=x11\fP, the default) and a Wayland
+session (\fBmode=wayland\fP). In Wayland mode the server is started as
+\fBXvnc --wayland\fP, \fBsession\fP refers to the files in
+\fI/usr/share/wayland-sessions\fP instead, the X server only options
+\fBauth\fP, \fBfp\fP and \fBpn\fP are not passed on, and the session runs
+under its own D-Bus session bus (\fBdbus-run-session\fP) unless one already
+exists. \fBvncsession\fP reads this option itself, from the system defaults,
+the user's config file and the mandatory file, so that the PAM session is
+opened with the matching \fBXDG_SESSION_TYPE\fP.
 .TP
 \fI$XDG_CONFIG_HOME/tigervnc/passwd\fP
 .TQ

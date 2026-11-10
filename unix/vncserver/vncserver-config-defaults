@@ -10,6 +10,7 @@
 # liking.
 
 # session=gnome
+# mode=x11
 # securitytypes=vncauth,tlsvnc
 # geometry=2000x1200
 # localhost

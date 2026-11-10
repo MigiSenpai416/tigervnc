@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sysexits.h>
 #include <unistd.h>
 #include <syslog.h>
@@ -358,6 +359,150 @@ switch_user(const char *username, uid_t uid, gid_t gid)
     }
 }
 
+/*
+ * Session mode ("mode=x11" or "mode=wayland" in the vncserver config
+ * files). vncserver itself decides how to start the server, but PAM
+ * (pam_systemd.so) needs XDG_SESSION_TYPE before the session is
+ * opened, so we have to peek at the same files here.
+ */
+
+enum session_mode { MODE_UNSET = 0, MODE_X11, MODE_WAYLAND };
+
+static enum session_mode
+read_mode(FILE *f, enum session_mode mode)
+{
+    char line[1024];
+
+    while (fgets(line, sizeof(line), f) != NULL) {
+        char *p, *end;
+
+        if (line[0] == '#')
+            continue;
+
+        p = line;
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (strncasecmp(p, "mode", 4) != 0)
+            continue;
+        p += 4;
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (*p != '=')
+            continue;
+        p++;
+        while (*p == ' ' || *p == '\t')
+            p++;
+        end = p + strlen(p);
+        while (end > p && (end[-1] == '\n' || end[-1] == '\r' ||
+                           end[-1] == ' ' || end[-1] == '\t'))
+            *--end = '\0';
+
+        if (strcasecmp(p, "wayland") == 0)
+            mode = MODE_WAYLAND;
+        else if (strcasecmp(p, "x11") == 0)
+            mode = MODE_X11;
+        else
+            syslog(LOG_WARNING, "Unknown session mode \"%s\", ignoring", p);
+    }
+
+    return mode;
+}
+
+static enum session_mode
+read_mode_path(const char *path, enum session_mode mode)
+{
+    FILE *f;
+
+    f = fopen(path, "r");
+    if (f == NULL)
+        return mode;
+    mode = read_mode(f, mode);
+    fclose(f);
+
+    return mode;
+}
+
+/* The user's own config file is read with the user's privileges */
+static enum session_mode
+read_user_mode(const struct passwd *pwent, enum session_mode mode)
+{
+    int fds[2];
+    pid_t pid;
+    char result;
+    ssize_t len;
+    int status;
+
+    if (pipe(fds) < 0) {
+        syslog(LOG_ERR, "pipe: %s", strerror(errno));
+        return mode;
+    }
+
+    pid = fork();
+    if (pid < 0) {
+        syslog(LOG_ERR, "fork: %s", strerror(errno));
+        close(fds[0]);
+        close(fds[1]);
+        return mode;
+    }
+
+    if (pid == 0) {
+        char path[PATH_MAX];
+        struct stat st;
+        enum session_mode user_mode = MODE_UNSET;
+
+        close(fds[0]);
+        switch_user(pwent->pw_name, pwent->pw_uid, pwent->pw_gid);
+
+        /* Same lookup as vncserver: ~/.config/tigervnc, else ~/.vnc */
+        snprintf(path, sizeof(path), "%s/.config/tigervnc", pwent->pw_dir);
+        if (stat(path, &st) != 0) {
+            snprintf(path, sizeof(path), "%s/.vnc", pwent->pw_dir);
+            if (stat(path, &st) != 0)
+                snprintf(path, sizeof(path), "%s/.config/tigervnc",
+                         pwent->pw_dir);
+        }
+        strncat(path, "/config", sizeof(path) - strlen(path) - 1);
+
+        user_mode = read_mode_path(path, MODE_UNSET);
+        result = (char)user_mode;
+        if (write(fds[1], &result, 1) != 1)
+            _exit(EX_OSERR);
+        _exit(0);
+    }
+
+    close(fds[1]);
+    do {
+        len = read(fds[0], &result, 1);
+    } while (len < 0 && errno == EINTR);
+    close(fds[0]);
+    while (waitpid(pid, &status, 0) < 0 && errno == EINTR)
+        ;
+
+    if (len == 1 && (result == MODE_X11 || result == MODE_WAYLAND))
+        mode = (enum session_mode)result;
+
+    return mode;
+}
+
+static enum session_mode
+get_session_mode(const char *username)
+{
+    struct passwd *pwent;
+    enum session_mode mode = MODE_UNSET;
+
+    mode = read_mode_path(CMAKE_INSTALL_FULL_SYSCONFDIR
+                          "/tigervnc/vncserver-config-defaults", mode);
+
+    pwent = getpwnam(username);
+    if (pwent != NULL)
+        mode = read_user_mode(pwent, mode);
+
+    mode = read_mode_path(CMAKE_INSTALL_FULL_SYSCONFDIR
+                          "/tigervnc/vncserver-config-mandatory", mode);
+
+    return mode == MODE_WAYLAND ? MODE_WAYLAND : MODE_X11;
+}
+
 static int
 mkdir_p(const char *path_, mode_t mode)
 {
@@ -652,7 +797,9 @@ main(int argc, char **argv)
     /* Indicate that this is a graphical user session. We need to do
        this here before PAM as pam_systemd.so looks at these. */
     if ((putenv("XDG_SESSION_CLASS=user") < 0) ||
-        (putenv("XDG_SESSION_TYPE=x11") < 0)) {
+        (putenv(get_session_mode(username) == MODE_WAYLAND ?
+                "XDG_SESSION_TYPE=wayland" :
+                "XDG_SESSION_TYPE=x11") < 0)) {
         syslog(LOG_CRIT, "putenv: %s", strerror(errno));
         return EX_OSERR;
     }
