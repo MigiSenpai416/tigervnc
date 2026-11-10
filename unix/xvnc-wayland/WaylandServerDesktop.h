@@ -34,7 +34,8 @@ namespace rfb { class VNCServer; }
 class WaylandServerDesktop : public rfb::SDesktop {
 public:
   WaylandServerDesktop(int width, int height, const char* socketName,
-                       bool xwayland, int nestedMode);
+                       bool xwayland, int nestedMode,
+                       const rfb::PixelFormat& nativePF);
   virtual ~WaylandServerDesktop();
 
   bool valid() const { return comp != nullptr; }
@@ -76,6 +77,10 @@ private:
   struct wvnc_compositor* comp;
   rfb::VNCServer* server;
   rfb::PixelBuffer* pb;
+  // The VNC side's native format. The compositor renders XRGB8888;
+  // for other depths pb is a converted copy updated on damage.
+  rfb::PixelFormat nativePF;
+  bool convert;
   std::string xDisplay;
   bool xReady;
 };

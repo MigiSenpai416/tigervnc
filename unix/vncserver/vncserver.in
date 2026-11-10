@@ -152,13 +152,8 @@ if ($sessionMode eq 'wayland') {
   foreach my $k ('auth', 'fp', 'pn') {
     delete $default_opts{$k};
   }
-  foreach my $k ('auth', 'fp', 'pn', 'nopn', 'listen', 'nolisten',
-                 'dpi', 'ac', 'noreset', 'co', 'xkbdir') {
-    if (exists $config{$k}) {
-      warn "Ignoring X server option '$k' in Wayland mode\n";
-      delete $config{$k};
-    }
-  }
+  # X-only options from the config files (dpi, ac, ...) are passed on;
+  # Xvnc --wayland ignores them with a warning
 } else {
   &X11SanityCheck();
 }
@@ -457,8 +452,9 @@ sub CheckDisplayNumber
 
 #
 # Wayland mode: Xvnc --wayland runs the session command itself (after
-# "--") once the compositor and Xwayland are up, and exits when the
-# session command exits, like xinit does in X11 mode.
+# "--") once the compositor and Xwayland are up. With -ExitWithSession
+# it exits when the session command exits, like xinit does in X11 mode
+# (on its own, Xvnc --wayland keeps the display running like Xvnc).
 #
 
 sub StartWaylandSession
@@ -472,6 +468,8 @@ sub StartWaylandSession
 
     push(@cmd, "@CMAKE_INSTALL_FULL_BINDIR@/Xvnc", "--wayland",
          ":$displayNumber");
+    # Like xinit in X11 mode: the server stops when the session ends
+    push(@cmd, "-ExitWithSession");
 
     foreach my $k (sort keys %config) {
         push(@cmd, "-$k");

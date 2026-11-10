@@ -38,5 +38,7 @@ extern core::BoolParameter rawKeyboard;
 extern core::StringParameter waylandDisplay;
 extern core::BoolParameter xwaylandEnabled;
 extern core::EnumParameter nestedCompositor;
+extern core::BoolParameter xwaylandAuth;
+extern core::BoolParameter exitWithSession;
 
 #endif

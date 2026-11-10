@@ -60,6 +60,7 @@
 
 #include <rdr/FdOutStream.h>
 
+#include <rfb/PixelFormat.h>
 #include <rfb/VNCServerST.h>
 
 #include <network/TcpSocket.h>
@@ -94,6 +95,110 @@ static void childHandler(int /*sig*/)
   errno = saved;
 }
 
+// X server options Xvnc accepts that mean nothing in Wayland mode.
+// They are ignored with a warning so that existing configurations and
+// scripts keep working. The number is how many arguments follow.
+static const struct { const char* name; int args; } ignoredXOptions[] = {
+  { "-auth", 1 }, { "-fp", 1 }, { "-pn", 0 }, { "-nopn", 0 },
+  { "-listen", 1 }, { "-nolisten", 1 }, { "-dpi", 1 }, { "-ac", 0 },
+  { "-noreset", 0 }, { "-reset", 0 }, { "-co", 1 }, { "-xkbdir", 1 },
+  { "-xkbmap", 1 }, { "-br", 0 }, { "-wr", 0 }, { "-nolock", 0 },
+  { "-dumbSched", 0 }, { "-s", 1 }, { "-dpms", 0 }, { "-nocursor", 0 },
+  { "-retro", 0 }, { "-tst", 0 }, { "-bs", 0 }, { "+bs", 0 },
+  { "-su", 0 }, { "-core", 0 }, { "-terminate", 0 }, { "-once", 0 },
+  { "-maxclients", 1 }, { "-audit", 1 }, { "-seat", 1 },
+  { "-nevershared", 0 }, { "-dontdisconnect", 0 }, { "+extension", 1 },
+  { "-extension", 1 }, { "-iglx", 0 }, { "+iglx", 0 }, { "-noclipboard", 0 },
+};
+
+// ---------------------------------------------------------------- Xauth
+//
+// wlroots starts Xwayland without an X authority file. Xvnc-wayland
+// points wlroots' WLR_XWAYLAND at itself; started that way (argv[0]
+// "Xwayland" and TIGERVNC_XWAYLAND_AUTH set) it writes a fresh
+// MIT-MAGIC-COOKIE-1 for the display it is given and execs the real
+// Xwayland with "-auth". The session gets XAUTHORITY pointing at the
+// same file, so only processes that can read it (the user's) connect.
+
+static void putAuthField(std::string& out, const void* data, size_t len)
+{
+  out += (char)((len >> 8) & 0xff);
+  out += (char)(len & 0xff);
+  out.append((const char*)data, len);
+}
+
+static bool writeXauthority(const char* path, const char* display)
+{
+  unsigned char cookie[16];
+  const char* num = display[0] == ':' ? display + 1 : display;
+  char host[256] = "";
+  std::string data;
+  int fd;
+
+  if (getentropy(cookie, sizeof(cookie)) != 0)
+    return false;
+  gethostname(host, sizeof(host) - 1);
+
+  static const char name[] = "MIT-MAGIC-COOKIE-1";
+  // FamilyLocal (256) with our host name, and FamilyWild (65535)
+  const unsigned families[] = { 256, 65535 };
+  for (unsigned fam : families) {
+    data += (char)(fam >> 8);
+    data += (char)(fam & 0xff);
+    if (fam == 256)
+      putAuthField(data, host, strlen(host));
+    else
+      putAuthField(data, "", 0);
+    putAuthField(data, num, strlen(num));
+    putAuthField(data, name, strlen(name));
+    putAuthField(data, cookie, sizeof(cookie));
+  }
+
+  std::string tmp = std::string(path) + ".tmp";
+  fd = open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+  if (fd < 0)
+    return false;
+  bool ok = write(fd, data.data(), data.size()) == (ssize_t)data.size();
+  ok = (close(fd) == 0) && ok;
+  if (!ok || rename(tmp.c_str(), path) != 0) {
+    unlink(tmp.c_str());
+    return false;
+  }
+  return true;
+}
+
+static void xwaylandWrapper(int argc, char** argv) __attribute__((noreturn));
+static void xwaylandWrapper(int argc, char** argv)
+{
+  const char* authFile = getenv("TIGERVNC_XWAYLAND_AUTH");
+  const char* real = getenv("TIGERVNC_XWAYLAND_REAL");
+  std::vector<char*> args;
+
+  if (argc < 2 || !writeXauthority(authFile, argv[1])) {
+    fprintf(stderr, "Xvnc-wayland: unable to write %s: %s\n", authFile,
+            strerror(errno));
+    _exit(1);
+  }
+
+  args.push_back(argv[0]);
+  args.push_back(argv[1]);
+  args.push_back((char*)"-auth");
+  args.push_back((char*)authFile);
+  for (int i = 2; i < argc; i++)
+    args.push_back(argv[i]);
+  args.push_back(nullptr);
+
+  unsetenv("TIGERVNC_XWAYLAND_AUTH");
+  unsetenv("TIGERVNC_XWAYLAND_REAL");
+  if (real && *real)
+    execv(real, args.data());
+  else
+    execvp("Xwayland", args.data());
+  fprintf(stderr, "Xvnc-wayland: unable to run Xwayland: %s\n",
+          strerror(errno));
+  _exit(1);
+}
+
 static void printVersion(FILE* fp)
 {
   fprintf(fp, _("TigerVNC server version %s, built %s\n"),
@@ -117,15 +222,19 @@ static void usage()
             "                       Wayland socket wayland-<display>\n"
             "-geometry WxH          set initial framebuffer size "
             "(default 1024x768)\n"
-            "-depth D               set framebuffer depth (only 24 is "
-            "supported)\n"
-            "-pixelformat fmt       set pixel format (only rgb888 is "
-            "supported)\n"
+            "-depth D               set framebuffer depth (8, 15, 16, 24 "
+            "or 32)\n"
+            "-pixelformat fmt       set pixel format (rgbNNN or bgrNNN)\n"
             "-inetd                 has been launched from inetd\n"
             "-- cmd [args]          run cmd as the desktop session once "
             "the display is\n"
-            "                       ready; the server exits when it "
-            "exits\n"));
+            "                       ready. The display keeps running "
+            "when it exits,\n"
+            "                       unless ExitWithSession is set\n"
+            "\n"
+            "X server options that have no meaning here (-auth, -fp, "
+            "-dpi, -ac, ...)\n"
+            "are accepted with a warning and ignored.\n"));
   fprintf(stderr,
           _("\n"
             "Parameters can be turned on with -<param> or off with -<param>=0\n"
@@ -195,6 +304,19 @@ static pid_t startSession(const std::vector<char*>& cmd,
     unsetenv("DISPLAY");
   setenv("XDG_SESSION_TYPE", "wayland", 1);
 
+  // Our Xwayland wrapper is for our own Xwayland only; a nested
+  // compositor must start its own Xwayland the normal way
+  const char* realXwayland = getenv("TIGERVNC_XWAYLAND_REAL");
+  if (realXwayland && *realXwayland && getenv("TIGERVNC_USER_WLR_XWAYLAND"))
+    setenv("WLR_XWAYLAND", realXwayland, 1);
+  else if (getenv("TIGERVNC_XWAYLAND_AUTH"))
+    unsetenv("WLR_XWAYLAND");
+  unsetenv("TIGERVNC_USER_WLR_XWAYLAND");
+  if (getenv("TIGERVNC_XWAYLAND_AUTH") && xDisplay && *xDisplay)
+    setenv("XAUTHORITY", getenv("TIGERVNC_XWAYLAND_AUTH"), 1);
+  unsetenv("TIGERVNC_XWAYLAND_AUTH");
+  unsetenv("TIGERVNC_XWAYLAND_REAL");
+
   std::vector<char*> argv(cmd);
   argv.push_back(nullptr);
   execvp(argv[0], argv.data());
@@ -210,6 +332,11 @@ int main(int argc, char** argv)
   int width = 1024, height = 768;
   int inetdSock = -1;
   std::vector<char*> sessionCmd;
+  rfb::PixelFormat nativePF(32, 24, false, true, 255, 255, 255, 16, 8, 0);
+
+  if (argc > 0 && getenv("TIGERVNC_XWAYLAND_AUTH") &&
+      strcmp(argv[0], "Xwayland") == 0)
+    xwaylandWrapper(argc, argv);
 
   setlocale(LC_ALL, "");
 
@@ -265,9 +392,21 @@ int main(int argc, char** argv)
                 argv[i]);
         exit(1);
       }
-      if (atoi(argv[i + 1]) != 24) {
-        fprintf(stderr, _("%s: Depth %s is not supported in Wayland "
-                          "mode, only 24\n"), programName, argv[i + 1]);
+      // Same formats as Xvnc picks for these depths
+      static const struct { int depth; const char* fmt; } depths[] = {
+        { 8, "rgb332" }, { 15, "rgb555" }, { 16, "rgb565" },
+        { 24, "rgb888" }, { 32, "rgb888" },
+      };
+      bool found = false;
+      for (auto& d : depths) {
+        if (atoi(argv[i + 1]) == d.depth) {
+          nativePF.parse(d.fmt);
+          found = true;
+        }
+      }
+      if (!found) {
+        fprintf(stderr, _("%s: Depth %s is not supported, use 8, 15, "
+                          "16, 24 or 32\n"), programName, argv[i + 1]);
         exit(1);
       }
       i += 2;
@@ -280,9 +419,8 @@ int main(int argc, char** argv)
                 argv[i]);
         exit(1);
       }
-      if (strcasecmp(argv[i + 1], "rgb888") != 0) {
-        fprintf(stderr, _("%s: Pixel format %s is not supported in "
-                          "Wayland mode, only rgb888\n"),
+      if (!nativePF.parse(argv[i + 1])) {
+        fprintf(stderr, _("%s: Invalid pixel format '%s'\n"),
                 programName, argv[i + 1]);
         exit(1);
       }
@@ -304,10 +442,25 @@ int main(int argc, char** argv)
       continue;
     }
 
-    if (strcmp(argv[i], "-noclipboard") == 0) {
-      // Only affects vncconfig, which is X11 only
-      i++;
-      continue;
+    {
+      bool ignored = false;
+      for (auto& opt : ignoredXOptions) {
+        if (strcmp(argv[i], opt.name) != 0)
+          continue;
+        if (i + opt.args >= argc) {
+          fprintf(stderr, _("Required argument to %s not specified\n"),
+                  argv[i]);
+          exit(1);
+        }
+        fprintf(stderr, _("%s: Warning: X server option '%s' has no "
+                          "effect in Wayland mode, ignored\n"),
+                programName, argv[i]);
+        i += 1 + opt.args;
+        ignored = true;
+        break;
+      }
+      if (ignored)
+        continue;
     }
 
     if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-help") == 0 ||
@@ -370,6 +523,27 @@ int main(int argc, char** argv)
   sigaction(SIGCHLD, &sa, nullptr);
   signal(SIGPIPE, SIG_IGN);
 
+  if (xwaylandEnabled && xwaylandAuth) {
+    char self[4096];
+    ssize_t n = readlink("/proc/self/exe", self, sizeof(self) - 1);
+    if (n > 0) {
+      self[n] = '\0';
+      std::string auth = std::string(getenv("XDG_RUNTIME_DIR")) + "/" +
+                         socketName + ".Xauthority";
+      const char* user = getenv("WLR_XWAYLAND");
+      if (user && *user) {
+        setenv("TIGERVNC_XWAYLAND_REAL", user, 1);
+        setenv("TIGERVNC_USER_WLR_XWAYLAND", "1", 1);
+      }
+      setenv("TIGERVNC_XWAYLAND_AUTH", auth.c_str(), 1);
+      setenv("WLR_XWAYLAND", self, 1);
+      vlog.info(_("Xwayland authority file: %s"), auth.c_str());
+    } else {
+      vlog.error(_("Cannot find our own executable, Xwayland runs "
+                   "without an X authority file"));
+    }
+  }
+
   std::list<network::SocketListener*> listeners;
   int ret = 0;
 
@@ -380,7 +554,7 @@ int main(int argc, char** argv)
     else if (nestedCompositor == "Off")
       nestedMode = WVNC_NESTED_OFF;
     WaylandServerDesktop desktop(width, height, socketName.c_str(),
-                                 xwaylandEnabled, nestedMode);
+                                 xwaylandEnabled, nestedMode, nativePF);
     if (!desktop.valid()) {
       vlog.error(_("Unable to create the Wayland display"));
       return 1;
@@ -493,7 +667,12 @@ int main(int argc, char** argv)
               vlog.info(_("Session terminated by signal %d"),
                         WTERMSIG(status));
             sessionPid = -1;
-            caughtTerm = 1;
+            if (exitWithSession) {
+              caughtTerm = 1;
+            } else {
+              vlog.info(_("The display keeps running until the server "
+                          "is stopped (ExitWithSession is off)"));
+            }
           }
         }
         if (caughtTerm)

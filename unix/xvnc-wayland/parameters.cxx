@@ -97,6 +97,17 @@ core::EnumParameter
                      "always manages windows as normal applications"),
                    {"Auto", "On", "Off"}, "Auto");
 
+core::BoolParameter
+  xwaylandAuth("XwaylandAuth",
+               _("Start Xwayland with a private X authority file "
+                 "(XAUTHORITY is set for the session)"),
+               true);
+core::BoolParameter
+  exitWithSession("ExitWithSession",
+                  _("Stop the server when the session command given "
+                    "after -- exits"),
+                  false);
+
 static const char* defaultDesktopName()
 {
   long host_max = sysconf(_SC_HOST_NAME_MAX);

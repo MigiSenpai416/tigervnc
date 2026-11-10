@@ -48,8 +48,10 @@ static const rfb::PixelFormat fbFormat(32, 24, false, true,
 WaylandServerDesktop::WaylandServerDesktop(int width, int height,
                                            const char* socketName,
                                            bool xwayland,
-                                           int nestedMode)
-  : comp(nullptr), server(nullptr), pb(nullptr), xReady(false)
+                                           int nestedMode,
+                                           const rfb::PixelFormat& pf)
+  : comp(nullptr), server(nullptr), pb(nullptr), nativePF(pf),
+    convert(!(pf == fbFormat)), xReady(false)
 {
   struct wvnc_options opts;
   struct wvnc_callbacks cb;
@@ -108,7 +110,11 @@ rfb::PixelBuffer* WaylandServerDesktop::createPixelBuffer()
 {
   int w, h, stride;
   uint8_t* data = wvnc_framebuffer(comp, &w, &h, &stride);
-  return new rfb::FullFramePixelBuffer(fbFormat, w, h, data, stride);
+  if (!convert)
+    return new rfb::FullFramePixelBuffer(fbFormat, w, h, data, stride);
+  rfb::ManagedPixelBuffer* mpb = new rfb::ManagedPixelBuffer(nativePF, w, h);
+  mpb->imageRect(fbFormat, core::Rect(0, 0, w, h), data, stride);
+  return mpb;
 }
 
 void WaylandServerDesktop::init(rfb::VNCServer* vs)
@@ -203,7 +209,17 @@ void WaylandServerDesktop::cbDamage(void* data, int x, int y, int w, int h)
   WaylandServerDesktop* self = (WaylandServerDesktop*)data;
   if (!self->server)
     return;
-  self->server->add_changed(core::Region(core::Rect(x, y, x + w, y + h)));
+  core::Rect r(x, y, x + w, y + h);
+  if (self->convert) {
+    int fw, fh, stride;
+    uint8_t* fb = wvnc_framebuffer(self->comp, &fw, &fh, &stride);
+    r = r.intersect(core::Rect(0, 0, fw, fh));
+    if (r.is_empty() || fw != self->pb->width() || fh != self->pb->height())
+      return;
+    ((rfb::ModifiablePixelBuffer*)self->pb)->imageRect(
+      fbFormat, r, fb + ((size_t)r.tl.y * stride + r.tl.x) * 4, stride);
+  }
+  self->server->add_changed(core::Region(r));
 }
 
 void WaylandServerDesktop::cbCursor(void* data, int w, int h, int hotx,
