@@ -1,5 +1,5 @@
 
-Tue Nov 10 15:30:55 2026
+Tue Nov 10 16:49:58 2026
  Main:        Xwayland authority file:
               /tmp/nestedtest/rt-1/tigervnc-wayland-1.Xauthority
  Main:        Wayland display wayland-1 created in /tmp/nestedtest/rt-1
@@ -19,43 +19,43 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::46694
- VNCSConnST:  Closing 127.0.0.1::46694: Clean disconnection
+ Connections: Accepted: 127.0.0.1::35314
+ VNCSConnST:  Closing 127.0.0.1::35314: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::46694
+ Connections: Closed: 127.0.0.1::35314
+
+Tue Nov 10 16:49:59 2026
  WaylandDesktop: Client pid 13 (wlroots) is a nested compositor serving
               /tmp/nestedtest/rt-1/wayland-2, giving it the whole screen
  WaylandDesktop: Connecting clipboard bridge to /tmp/nestedtest/rt-1/wayland-2
  WaylandDesktop: Clipboard bridge to nested compositor (pid 13) ready,
               wlr-data-control v2
-
-Tue Nov 10 15:30:56 2026
- Connections: Accepted: 127.0.0.1::46702
+ Connections: Accepted: 127.0.0.1::35324
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VncAuth(2)
  VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
  VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
 
-Tue Nov 10 15:31:07 2026
+Tue Nov 10 16:50:10 2026
  WaylandDesktop: Framebuffer resized to 1280x720
  VNCSConnST:  FramebufferUpdateRequest 1024x768 at 0,0 exceeds framebuffer
               1280x720
 
-Tue Nov 10 15:31:10 2026
+Tue Nov 10 16:50:13 2026
  Main:        Terminating
- VNCSConnST:  Closing 127.0.0.1::46702: Clean disconnection
+ VNCSConnST:  Closing 127.0.0.1::35324: Clean disconnection
  EncodeManager: Framebuffer updates: 8
  EncodeManager:   Raw:
- EncodeManager:     Solid: 63 rects, 3.25872 Mpixels
- EncodeManager:            12.4317 MiB (1:1 ratio)
+ EncodeManager:     Solid: 62 rects, 3.25788 Mpixels
+ EncodeManager:            12.4286 MiB (1:1 ratio)
  EncodeManager:     Bitmap RLE: 2 rects, 1.134 kpixels
  EncodeManager:                 4.45312 KiB (1:1 ratio)
  EncodeManager:     Indexed RLE: 3 rects, 2.128 kpixels
  EncodeManager:                  8.34766 KiB (1:1 ratio)
  EncodeManager:     Full Colour: 20 rects, 28.718 kpixels
  EncodeManager:                  112.414 KiB (1:1 ratio)
- EncodeManager:   Total: 88 rects, 3.2907 Mpixels
- EncodeManager:          12.554 MiB (1:1 ratio)
+ EncodeManager:   Total: 87 rects, 3.28986 Mpixels
+ EncodeManager:          12.5508 MiB (1:1 ratio)
  Main:        Terminated

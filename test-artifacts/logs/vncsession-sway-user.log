@@ -1,10 +1,10 @@
 Using desktop session sway
 
-New '86ea95366efd:6 (vncuser)' Wayland desktop is 86ea95366efd:6
+New 'bf9b20db1994:6 (vncuser)' Wayland desktop is bf9b20db1994:6
 
 Starting Wayland desktop session sway
 
-Tue Nov 10 15:31:57 2026
+Tue Nov 10 16:51:00 2026
  Main:        XDG_RUNTIME_DIR not set, using /tmp/runtime-1001
  Main:        Xwayland authority file:
               /tmp/runtime-1001/tigervnc-wayland-6.Xauthority
@@ -15,7 +15,7 @@ Tue Nov 10 15:31:57 2026
 Xwayland glamor: GBM Wayland interfaces not available
 Failed to initialize glamor, falling back to sw
  WaylandDesktop: Xwayland ready on DISPLAY=:0
- Main:        Started session 'dbus-run-session' (pid 125)
+ Main:        Started session 'dbus-run-session' (pid 124)
 The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Unsupported maximum keycode 708, clipping.
 >                   X11 cannot support keycodes above 255.
@@ -24,17 +24,17 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- WaylandDesktop: Client pid 129 (wlroots) is a nested compositor serving
+ WaylandDesktop: Client pid 128 (wlroots) is a nested compositor serving
               /tmp/runtime-1001/wayland-1, giving it the whole screen
  WaylandDesktop: Connecting clipboard bridge to /tmp/runtime-1001/wayland-1
 sh: 1: systemctl: not found
- WaylandDesktop: Clipboard bridge to nested compositor (pid 129) ready,
+2026-11-10 16:51:00 - [main.c:278] Could not find config for output WL-1 ((null))
+ WaylandDesktop: Clipboard bridge to nested compositor (pid 128) ready,
               wlr-data-control v2
-2026-11-10 15:31:57 - [main.c:278] Could not find config for output WL-1 ((null))
-00:00:00.006 [INFO] [swaybar/tray/icon.c:339] Warning: no icon themes loaded
- Connections: Accepted: 127.0.0.1::45180
- VNCSConnST:  Closing 127.0.0.1::45180: Clean disconnection
+00:00:00.013 [INFO] [swaybar/tray/icon.c:339] Warning: no icon themes loaded
+ Connections: Accepted: 127.0.0.1::37418
+ VNCSConnST:  Closing 127.0.0.1::37418: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::45180
+ Connections: Closed: 127.0.0.1::37418

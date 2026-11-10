@@ -1,5 +1,5 @@
 
-Tue Nov 10 15:29:48 2026
+Tue Nov 10 16:48:52 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-9.Xauthority
  Main:        Wayland display wayland-9 created in /tmp/wltest/xdg-runtime
@@ -19,22 +19,22 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::34598
- Connections: Accepted: 127.0.0.1::34614
- VNCSConnST:  Closing 127.0.0.1::34598: Clean disconnection
+ Connections: Accepted: 127.0.0.1::43160
+ Connections: Accepted: 127.0.0.1::43168
+ VNCSConnST:  Closing 127.0.0.1::43160: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::34598
+ Connections: Closed: 127.0.0.1::43160
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VncAuth(2)
  VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
  VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
  WaylandDesktop: Framebuffer resized to 1600x600
 
-Tue Nov 10 15:29:58 2026
+Tue Nov 10 16:49:02 2026
  Main:        Terminating
- VNCSConnST:  Closing 127.0.0.1::34614: Clean disconnection
+ VNCSConnST:  Closing 127.0.0.1::43168: Clean disconnection
  EncodeManager: Framebuffer updates: 5
  EncodeManager:   Raw:
  EncodeManager:     Solid: 68 rects, 3.83068 Mpixels

@@ -1,5 +1,5 @@
 
-Tue Nov 10 15:31:10 2026
+Tue Nov 10 16:50:13 2026
  Main:        Xwayland authority file:
               /tmp/nestedtest/rt-2/tigervnc-wayland-2.Xauthority
  Main:        Wayland display wayland-2 created in /tmp/nestedtest/rt-2
@@ -24,25 +24,25 @@ Errors from xkbcomp are not fatal to the X server
  WaylandDesktop: Connecting clipboard bridge to /tmp/nestedtest/rt-2/wayland-1
  WaylandDesktop: Clipboard bridge to nested compositor (pid 52) ready,
               wlr-data-control v2
- Connections: Accepted: 127.0.0.1::41574
- Connections: Accepted: 127.0.0.1::41588
- VNCSConnST:  Closing 127.0.0.1::41574: Clean disconnection
+ Connections: Accepted: 127.0.0.1::38204
+ Connections: Accepted: 127.0.0.1::38208
+ VNCSConnST:  Closing 127.0.0.1::38204: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::41574
+ Connections: Closed: 127.0.0.1::38204
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VncAuth(2)
  VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
  VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
 
-Tue Nov 10 15:31:12 2026
+Tue Nov 10 16:50:15 2026
  WaylandDesktop: Framebuffer resized to 1600x600
  VNCSConnST:  FramebufferUpdateRequest 1024x768 at 0,0 exceeds framebuffer
               1600x600
 
-Tue Nov 10 15:31:14 2026
- VNCSConnST:  Closing 127.0.0.1::41588: Clean disconnection
+Tue Nov 10 16:50:18 2026
+ VNCSConnST:  Closing 127.0.0.1::38208: Clean disconnection
  EncodeManager: Framebuffer updates: 2
  EncodeManager:   Raw:
  EncodeManager:     Solid: 30 rects, 1.74432 Mpixels
@@ -51,6 +51,6 @@ Tue Nov 10 15:31:14 2026
  EncodeManager:                  8.27344 KiB (1:1 ratio)
  EncodeManager:   Total: 32 rects, 1.74643 Mpixels
  EncodeManager:          6.66248 MiB (1:1 ratio)
- Connections: Closed: 127.0.0.1::41588
+ Connections: Closed: 127.0.0.1::38208
  Main:        Terminating
  Main:        Terminated

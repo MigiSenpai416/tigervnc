@@ -1,5 +1,5 @@
 
-Tue Nov 10 15:29:42 2026
+Tue Nov 10 16:48:45 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-8.Xauthority
  Main:        Wayland display wayland-8 created in /tmp/wltest/xdg-runtime
@@ -19,20 +19,22 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::55370
- VNCSConnST:  Closing 127.0.0.1::55370: Clean disconnection
+
+Tue Nov 10 16:48:46 2026
+ Connections: Accepted: 127.0.0.1::35788
+ VNCSConnST:  Closing 127.0.0.1::35788: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::55370
- Connections: Accepted: 127.0.0.1::55372
+ Connections: Closed: 127.0.0.1::35788
+ Connections: Accepted: 127.0.0.1::35796
  SConnection: Client needs protocol version 3.8
  SConnection: Client requests security type VncAuth(2)
  VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
  VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
 
-Tue Nov 10 15:29:48 2026
- VNCSConnST:  Closing 127.0.0.1::55372: Clean disconnection
+Tue Nov 10 16:48:51 2026
+ VNCSConnST:  Closing 127.0.0.1::35796: Clean disconnection
  EncodeManager: Framebuffer updates: 1
  EncodeManager:   Raw:
  EncodeManager:     Solid: 8 rects, 291.833 kpixels
@@ -43,11 +45,6 @@ Tue Nov 10 15:29:48 2026
  EncodeManager:                  21.6562 KiB (1:1 ratio)
  EncodeManager:   Total: 14 rects, 307.2 kpixels
  EncodeManager:          1.17204 MiB (1:1 ratio)
- Connections: Closed: 127.0.0.1::55372
-00:00:06.101 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 183, value 4194305
-00:00:06.101 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 185, value 4194305
-00:00:06.101 [ERROR] [xwayland/xwm.c:1920] xcb error: op ChangeProperty (no minor), code Window (no extension), sequence 188, value 4194305
-00:00:06.101 [ERROR] [xwayland/xwm.c:1920] xcb error: op DeleteProperty (no minor), code Window (no extension), sequence 189, value 4194305
-00:00:06.101 [ERROR] [xwayland/xwm.c:1920] xcb error: op DeleteProperty (no minor), code Window (no extension), sequence 192, value 4194305
+ Connections: Closed: 127.0.0.1::35796
  Main:        Terminating
  Main:        Terminated

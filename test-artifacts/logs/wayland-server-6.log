@@ -4,7 +4,7 @@ Xvnc: Warning: X server option '-fp' has no effect in Wayland mode, ignored
 Xvnc: Warning: X server option '-noreset' has no effect in Wayland mode, ignored
 Xvnc: Warning: X server option '-pn' has no effect in Wayland mode, ignored
 
-Tue Nov 10 15:29:36 2026
+Tue Nov 10 16:48:39 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-6.Xauthority
  Main:        Wayland display wayland-6 created in /tmp/wltest/xdg-runtime
@@ -24,9 +24,9 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::43162
+ Connections: Accepted: 127.0.0.1::53558
  Main:        Terminating
- VNCSConnST:  Closing 127.0.0.1::43162: The server is shutting down
+ VNCSConnST:  Closing 127.0.0.1::53558: The server is shutting down
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)

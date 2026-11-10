@@ -28,17 +28,17 @@
 
 | Result | Test | Detail | Artifacts |
 |---|---|---|---|
-| PASS | vncsession with mode=wayland starts Xvnc-wayland as the user, XDG_SESSION_TYPE=wayland for PAM | vncsession rc=0 pid=10, port 5901 up=True, servers=[(12, 'Xvnc-wayland', 'vncuser')], server env from vncsession: XDG_SESSION_TYPE='wayland' XDG_SESSION_CLASS='user'  |  |
-| PASS | Wayland session environment | USER=vncuser, XDG_SESSION_TYPE=wayland, WAYLAND_DISPLAY=wayland-1, DISPLAY=:0, XDG_CURRENT_DESKTOP=VncTest, XDG_SESSION_DESKTOP=vnc-test, DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-NNJ3gfE6W3,guid=bdc1060b19bc592ada29cf286af338d3 |  |
+| PASS | vncsession with mode=wayland starts Xvnc-wayland as the user, XDG_SESSION_TYPE=wayland for PAM | vncsession rc=0 pid=9, port 5901 up=True, servers=[(11, 'Xvnc-wayland', 'vncuser')], server env from vncsession: XDG_SESSION_TYPE='wayland' XDG_SESSION_CLASS='user'  |  |
+| PASS | Wayland session environment | USER=vncuser, XDG_SESSION_TYPE=wayland, WAYLAND_DISPLAY=wayland-1, DISPLAY=:0, XDG_CURRENT_DESKTOP=VncTest, XDG_SESSION_DESKTOP=vnc-test, DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-1dJpKDGNIo,guid=c42e26373ef9ee90884ec3a36af34b5a |  |
 | PASS | Wayland session visible over VNC (foot + xterm) | foot area (302, 332, 720, 512), xterm area (20, 22, 322, 128) | test-artifacts/vncsession-01-wayland-session.png |
-| PASS | session log | /home/vncuser/.local/state/tigervnc/86ea95366efd:1.log (copied to logs/vncsession-wayland-user.log) |  |
+| PASS | session log | /home/vncuser/.local/state/tigervnc/bf9b20db1994:1.log (copied to logs/vncsession-wayland-user.log) |  |
 | PASS | stop | vncsession exited and removed its pid file after the server stopped |  |
-| PASS | vncsession without mode keeps X11 (Xvnc + Xsession) | no mode: server env XDG_SESSION_TYPE='x11', servers=[(65, 'Xvnc', 'vncuser')], session DISPLAY=':2' | test-artifacts/vncsession-02-x11-default.png |
-| PASS | vncsession starts the stock sway session (sway.desktop) as a nested compositor | stock sway.desktop via vncsession: rc=0, sway outputs [('WL-1', 1024, 768)], server log ['WaylandDesktop: Client pid 129 (wlroots) is a nested compositor serving', 'WaylandDesktop: Clipboard bridge to nested compositor (pid 129) ready,'] (log copied to logs/vncsession-sway-user.log) | test-artifacts/vncsession-03-sway-session.png |
+| PASS | vncsession without mode keeps X11 (Xvnc + Xsession) | no mode: server env XDG_SESSION_TYPE='x11', servers=[(64, 'Xvnc', 'vncuser')], session DISPLAY=':2' | test-artifacts/vncsession-02-x11-default.png |
+| PASS | vncsession starts the stock sway session (sway.desktop) as a nested compositor | stock sway.desktop via vncsession: rc=0, sway outputs [('WL-1', 1024, 768)], server log ['WaylandDesktop: Client pid 128 (wlroots) is a nested compositor serving', 'WaylandDesktop: Clipboard bridge to nested compositor (pid 128) ready,'] (log copied to logs/vncsession-sway-user.log) | test-artifacts/vncsession-03-sway-session.png |
 | PASS | stock sway session: Super+Return opens foot, typed command runs inside sway, resize follows | Super+Return + typed command in sway's terminal: 'sway-session-42-sway'; after resize to 1280x800 sway outputs [('WL-1', 1280, 800)] | test-artifacts/vncsession-04-sway-terminal.png |
-| PASS | explicit mode=x11 behaves like the default | mode=x11: servers=[(201, 'Xvnc', 'vncuser')], XDG_SESSION_TYPE='x11', Xvnc args '/usr/bin/Xvnc :3 -geometry 1024x768 -localhost -securitytypes VncAuth -auth /home/vncuser/.Xauthority -desktop 86ea95366efd:3 (vncuser) -fp /usr/share/fonts/X11//misc -pn -rfbauth /home/vncuser/.config/tigervnc/passwd -rfbport 5903' |  |
+| PASS | explicit mode=x11 behaves like the default | mode=x11: servers=[(200, 'Xvnc', 'vncuser')], XDG_SESSION_TYPE='x11', Xvnc args '/usr/bin/Xvnc :3 -geometry 1024x768 -localhost -securitytypes VncAuth -auth /home/vncuser/.Xauthority -desktop bf9b20db1994:3 (vncuser) -fp /usr/share/fonts/X11//misc -pn -rfbauth /home/vncuser/.config/tigervnc/passwd -rfbport 5903' |  |
 | PASS | invalid mode is rejected by vncsession and vncserver | vncsession rc=71, servers=[]; vncserver rc=255: "Invalid mode 'wayland2', must be 'x11' or 'wayland'" |  |
-| PASS | mode value is case-insensitive and whitespace-trimmed | 'mode = Wayland ': servers=[(264, 'Xvnc-wayland', 'vncuser')] XDG_SESSION_TYPE='wayland' |  |
+| PASS | mode value is case-insensitive and whitespace-trimmed | 'mode = Wayland ': servers=[(263, 'Xvnc-wayland', 'vncuser')] XDG_SESSION_TYPE='wayland' |  |
 
 ## wayland
 
@@ -84,9 +84,9 @@
 
 | Result | Test | Detail | Artifacts |
 |---|---|---|---|
-| PASS | Xvnc does not link wlroots | Xvnc links wlroots/wayland-server: [] |  |
+| PASS | Xvnc does not link wlroots | Xvnc NEEDED ['libgcrypt.so.20', 'libunwind.so.8', 'libjpeg.so.8', 'libpam.so.0', 'libhogweed.so.6', 'libgmp.so.10', 'libz.so.1', 'libgnutls.so.30', 'libnettle.so.8', 'libpixman-1.so.0', 'libXfont2.so.2', 'libXau.so.6', 'libsystemd.so.0', 'libxshmfence.so.1', 'libXdmcp.so.6', 'libGL.so.1', 'libxcvt.so.0', 'libgbm.so.1', 'libstdc++.so.6', 'libm.so.6', 'libc.so.6']: wayland/wlroots []; wlroots/waylan |  |
 | PASS | Xvnc -help (X server usage + mode flags) | Xvnc -help lists X server options, VNC parameters and the --x11/--wayland lines (logs/x11-Xvnc-help.txt) |  |
-| PASS | Xvnc -version | Xvnc TigerVNC 1.16.2 - built Nov 10 2026 15:28:19 / Copyright (C) 1999-2026 TigerVNC team and many others (see README.rst) / See https://www.tigervnc.org for information on TigerVNC. / Underlying X server release 12101022 |  |
+| PASS | Xvnc -version | Xvnc TigerVNC 1.16.2 - built Nov 10 2026 16:47:20 / Copyright (C) 1999-2026 TigerVNC team and many others (see README.rst) / See https://www.tigervnc.org for information on TigerVNC. / Underlying X server release 12101022 |  |
 | PASS | Xvnc :2 starts (no flag) | port 5902 up=True; dimensions: 1024x768 pixels (271x203 millimeters) depth of root window: 24 planes |  |
 | PASS | auth: VncAuth + X509Vnc, wrong password rejected | VncAuth ok, wrong password rejected, X509Vnc ok (TLSv1.3) |  |
 | PASS | X11 clients render (xterm, xeyes) | xterm area (102, 102, 464, 260), xeyes colours 161 | test-artifacts/x11-01-xterm-xeyes.png |

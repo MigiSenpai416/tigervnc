@@ -3,14 +3,14 @@
     "suite": "vncsession",
     "test": "vncsession with mode=wayland starts Xvnc-wayland as the user, XDG_SESSION_TYPE=wayland for PAM",
     "status": "PASS",
-    "detail": "vncsession rc=0 pid=10, port 5901 up=True, servers=[(12, 'Xvnc-wayland', 'vncuser')], server env from vncsession: XDG_SESSION_TYPE='wayland' XDG_SESSION_CLASS='user' ",
+    "detail": "vncsession rc=0 pid=9, port 5901 up=True, servers=[(11, 'Xvnc-wayland', 'vncuser')], server env from vncsession: XDG_SESSION_TYPE='wayland' XDG_SESSION_CLASS='user' ",
     "artifacts": []
   },
   {
     "suite": "vncsession",
     "test": "Wayland session environment",
     "status": "PASS",
-    "detail": "USER=vncuser, XDG_SESSION_TYPE=wayland, WAYLAND_DISPLAY=wayland-1, DISPLAY=:0, XDG_CURRENT_DESKTOP=VncTest, XDG_SESSION_DESKTOP=vnc-test, DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-NNJ3gfE6W3,guid=bdc1060b19bc592ada29cf286af338d3",
+    "detail": "USER=vncuser, XDG_SESSION_TYPE=wayland, WAYLAND_DISPLAY=wayland-1, DISPLAY=:0, XDG_CURRENT_DESKTOP=VncTest, XDG_SESSION_DESKTOP=vnc-test, DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-1dJpKDGNIo,guid=c42e26373ef9ee90884ec3a36af34b5a",
     "artifacts": []
   },
   {
@@ -26,7 +26,7 @@
     "suite": "vncsession",
     "test": "session log",
     "status": "PASS",
-    "detail": "/home/vncuser/.local/state/tigervnc/86ea95366efd:1.log (copied to logs/vncsession-wayland-user.log)",
+    "detail": "/home/vncuser/.local/state/tigervnc/bf9b20db1994:1.log (copied to logs/vncsession-wayland-user.log)",
     "artifacts": []
   },
   {
@@ -40,7 +40,7 @@
     "suite": "vncsession",
     "test": "vncsession without mode keeps X11 (Xvnc + Xsession)",
     "status": "PASS",
-    "detail": "no mode: server env XDG_SESSION_TYPE='x11', servers=[(65, 'Xvnc', 'vncuser')], session DISPLAY=':2'",
+    "detail": "no mode: server env XDG_SESSION_TYPE='x11', servers=[(64, 'Xvnc', 'vncuser')], session DISPLAY=':2'",
     "artifacts": [
       "/artifacts/vncsession-02-x11-default.png"
     ]
@@ -49,7 +49,7 @@
     "suite": "vncsession",
     "test": "vncsession starts the stock sway session (sway.desktop) as a nested compositor",
     "status": "PASS",
-    "detail": "stock sway.desktop via vncsession: rc=0, sway outputs [('WL-1', 1024, 768)], server log ['WaylandDesktop: Client pid 129 (wlroots) is a nested compositor serving', 'WaylandDesktop: Clipboard bridge to nested compositor (pid 129) ready,'] (log copied to logs/vncsession-sway-user.log)",
+    "detail": "stock sway.desktop via vncsession: rc=0, sway outputs [('WL-1', 1024, 768)], server log ['WaylandDesktop: Client pid 128 (wlroots) is a nested compositor serving', 'WaylandDesktop: Clipboard bridge to nested compositor (pid 128) ready,'] (log copied to logs/vncsession-sway-user.log)",
     "artifacts": [
       "/artifacts/vncsession-03-sway-session.png"
     ]
@@ -67,7 +67,7 @@
     "suite": "vncsession",
     "test": "explicit mode=x11 behaves like the default",
     "status": "PASS",
-    "detail": "mode=x11: servers=[(201, 'Xvnc', 'vncuser')], XDG_SESSION_TYPE='x11', Xvnc args '/usr/bin/Xvnc :3 -geometry 1024x768 -localhost -securitytypes VncAuth -auth /home/vncuser/.Xauthority -desktop 86ea95366efd:3 (vncuser) -fp /usr/share/fonts/X11//misc -pn -rfbauth /home/vncuser/.config/tigervnc/passwd -rfbport 5903'",
+    "detail": "mode=x11: servers=[(200, 'Xvnc', 'vncuser')], XDG_SESSION_TYPE='x11', Xvnc args '/usr/bin/Xvnc :3 -geometry 1024x768 -localhost -securitytypes VncAuth -auth /home/vncuser/.Xauthority -desktop bf9b20db1994:3 (vncuser) -fp /usr/share/fonts/X11//misc -pn -rfbauth /home/vncuser/.config/tigervnc/passwd -rfbport 5903'",
     "artifacts": []
   },
   {
@@ -81,7 +81,7 @@
     "suite": "vncsession",
     "test": "mode value is case-insensitive and whitespace-trimmed",
     "status": "PASS",
-    "detail": "'mode = Wayland ': servers=[(264, 'Xvnc-wayland', 'vncuser')] XDG_SESSION_TYPE='wayland'",
+    "detail": "'mode = Wayland ': servers=[(263, 'Xvnc-wayland', 'vncuser')] XDG_SESSION_TYPE='wayland'",
     "artifacts": []
   }
 ]

@@ -1,5 +1,5 @@
 
-Tue Nov 10 15:29:30 2026
+Tue Nov 10 16:48:33 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-4.Xauthority
  Main:        Wayland display wayland-4 created in /tmp/wltest/xdg-runtime
@@ -19,14 +19,14 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::57216
- VNCSConnST:  Closing 127.0.0.1::57216: Clean disconnection
+ Connections: Accepted: 127.0.0.1::39666
+ VNCSConnST:  Closing 127.0.0.1::39666: Clean disconnection
  EncodeManager: Framebuffer updates: 0
  EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::57216
+ Connections: Closed: 127.0.0.1::39666
 
-Tue Nov 10 15:29:33 2026
+Tue Nov 10 16:48:36 2026
  Main:        Session exited with status 0
  Main:        Terminating
 (EE) failed to read Wayland events: Broken pipe
