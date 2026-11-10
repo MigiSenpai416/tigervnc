@@ -88,6 +88,9 @@ struct wvnc_options {
   /* Whether top level windows of a nested compositor get whole
    * screens instead of being managed as normal windows */
   enum wvnc_nested_mode nested_mode;
+  /* Title bars for managed X11 windows (Wayland clients draw their
+   * own decorations) */
+  bool x11_title_bars;
 };
 
 struct wvnc_compositor* wvnc_compositor_create(const struct wvnc_options* opts,

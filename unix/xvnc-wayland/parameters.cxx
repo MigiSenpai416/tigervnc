@@ -98,6 +98,11 @@ core::EnumParameter
                    {"Auto", "On", "Off"}, "Auto");
 
 core::BoolParameter
+  x11TitleBars("X11TitleBars",
+               _("Draw title bars (move, maximize and close) on X11 "
+                 "windows; Wayland applications draw their own"),
+               true);
+core::BoolParameter
   xwaylandAuth("XwaylandAuth",
                _("Start Xwayland with a private X authority file "
                  "(XAUTHORITY is set for the session)"),

@@ -62,6 +62,7 @@ WaylandServerDesktop::WaylandServerDesktop(int width, int height,
   opts.socket_name = socketName;
   opts.xwayland = xwayland;
   opts.nested_mode = (enum wvnc_nested_mode)nestedMode;
+  opts.x11_title_bars = x11TitleBars;
 
   memset(&cb, 0, sizeof(cb));
   cb.data = this;

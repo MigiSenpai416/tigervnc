@@ -844,4 +844,95 @@ def t_output_management():
 s.run("wlr-output-management: wlr-randr --custom-mode resizes the "
       "desktop for all viewers; unsupported changes are refused",
       t_output_management)
+def xwin_geometry(env, wid):
+    import re
+    rc, out = sh(["xdotool", "getwindowgeometry", wid], env=env)
+    m = re.search(r"Position: (-?\d+),(-?\d+).*?Geometry: (\d+)x(\d+)",
+                  out, re.S)
+    return tuple(int(g) for g in m.groups()) if m else None
+
+
+def t_x11_title_bars():
+    import subprocess
+    T = 22                            # title bar height
+    BAR = (51, 84, 135)               # focused title bar colour
+    envf, sess = small_session(11)
+    p = start_small(11, ["-geometry", "800x600"], sess)
+    shots, notes = [], []
+    ok = True
+    try:
+        wait_tcp(5911, timeout=20)
+        env = small_app_env(envf)
+        c = RFBClient(port=5911, security="VncAuth", password=PASSWORD)
+        xt = subprocess.Popen(["xterm", "-bg", "white", "-geometry",
+                               "30x8+100+100"], env=env)
+        rc, wid = sh(["xdotool", "search", "--sync", "--class", "XTerm"],
+                     env=env, timeout=15)
+        wid = wid.split()[0] if wid.split() else "0"
+        time.sleep(1.5)
+        c.refresh()
+        g = xwin_geometry(env, wid)
+        shots.append(c.screenshot(s.artifact("wayland-17-x11-title-bar.png")))
+        bar = c.pixel(g[0] + 10, g[1] - T // 2) if g else None
+        has_bar = g is not None and near(bar, BAR, 3)
+        notes.append("xterm at %r, title bar pixel %r" % (g, bar))
+        ok = ok and has_bar
+
+        # drag the title bar by (+200, +150)
+        bx, by = g[0] + 20, g[1] - T // 2
+        c.drag(bx, by, bx + 200, by + 150)
+        time.sleep(1)
+        g2 = xwin_geometry(env, wid)
+        c.refresh()
+        shots.append(c.screenshot(s.artifact(
+            "wayland-18-x11-title-bar-moved.png")))
+        moved = g2 is not None and (g2[0], g2[1]) == (g[0] + 200, g[1] + 150)
+        notes.append("after dragging the bar by +200,+150: %r" % (g2,))
+        ok = ok and moved
+
+        # maximize button (second from the right)
+        w = g2[2]
+        mx, my = g2[0] + w - 2 * T + T // 2, g2[1] - T // 2
+        c.click(mx, my)
+        time.sleep(1.5)
+        g3 = xwin_geometry(env, wid)
+        c.refresh()
+        shots.append(c.screenshot(s.artifact(
+            "wayland-19-x11-title-bar-maximized.png")))
+        maxed = g3 is not None and (g3[0], g3[1]) == (0, T) and \
+            g3[2] >= 790 and g3[3] >= 600 - T - 20
+        notes.append("maximize button -> %r (want 0,%d ~800x%d)" %
+                     (g3, T, 600 - T))
+        ok = ok and maxed
+
+        # again: restore
+        c.click(g3[0] + g3[2] - 2 * T + T // 2, g3[1] - T // 2)
+        time.sleep(1.5)
+        g4 = xwin_geometry(env, wid)
+        restored = g4 is not None and g4 == g2
+        notes.append("maximize again -> %r (want %r)" % (g4, g2))
+        ok = ok and restored
+
+        # close button (rightmost): xterm gets WM_DELETE_WINDOW and exits
+        c.click(g4[0] + g4[2] - T // 2, g4[1] - T // 2)
+        try:
+            xt.wait(5)
+            closed = True
+        except Exception:
+            closed = False
+            xt.kill()
+        notes.append("close button -> xterm exited=%s" % closed)
+        ok = ok and closed
+        c.close()
+    except Exception as e:
+        ok = False
+        notes.append("error: %r" % e)
+    finally:
+        os.killpg(p.pid, 15)
+        p.wait(10)
+    return ok, "; ".join(notes), shots
+
+
+s.run("X11 title bars: drawn on X11 windows, drag moves, maximize/"
+      "restore and close buttons work", t_x11_title_bars)
 sys.exit(s.finish())

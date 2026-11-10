@@ -121,6 +121,7 @@ enum owner_type {
   OWNER_XDG,
   OWNER_XWAYLAND,
   OWNER_LAYER,
+  OWNER_DECO,
 };
 
 /* Common first member of anything we hang off scene node->data */
@@ -130,6 +131,7 @@ struct owner {
 
 enum grab_mode {
   GRAB_NONE,
+  GRAB_DECO,  /* button pressed on a title bar button */
   GRAB_MOVE,
   GRAB_RESIZE,
 };
@@ -268,6 +270,7 @@ struct wvnc_compositor {
 
   /* Nested compositor support */
   enum wvnc_nested_mode nested_mode;
+  bool x11_title_bars;
   struct wlr_box screens[MAX_SCREENS];
   int num_screens; /* 0: one screen covering the framebuffer */
   unsigned int view_seq;
@@ -281,6 +284,7 @@ struct view {
   struct wlr_scene_tree* scene_tree;
   bool mapped;
   bool maximized, fullscreen;
+  bool activated;
   struct wlr_box saved; /* geometry before maximize/fullscreen */
   /* An output window of a nested compositor: it gets a whole screen,
    * stays at the bottom and can't be moved or resized */
@@ -302,6 +306,15 @@ struct view {
 
 #ifdef HAVE_XWAYLAND
   struct wlr_xwayland_surface* xsurface;
+  /* Title bar for managed X11 windows */
+  struct wlr_scene_tree* deco;
+  struct wlr_scene_rect* deco_bar;
+  struct wlr_scene_rect* deco_buttons[2];   /* maximize, close */
+  struct deco_part {
+    struct owner owner;
+    struct view* view;
+    int kind;
+  } deco_parts[3];
   struct wl_listener associate;
   struct wl_listener dissociate;
   struct wl_listener request_configure;
@@ -559,13 +572,18 @@ static void view_set_box(struct view* v, const struct wlr_box* box)
 #endif
 }
 
+static void deco_update(struct view* v);
+
 static void view_set_activated(struct view* v, bool activated)
 {
+  v->activated = activated;
   if (v->owner.type == OWNER_XDG)
     wlr_xdg_toplevel_set_activated(v->xdg, activated);
 #ifdef HAVE_XWAYLAND
-  else
+  else {
     wlr_xwayland_surface_activate(v->xsurface, activated);
+    deco_update(v);
+  }
 #endif
 }
 
@@ -776,6 +794,81 @@ static void view_place(struct view* v)
   }
 }
 
+/* X11 title bars ----------------------------------------------------- */
+
+#define DECO_HEIGHT 22
+enum { DECO_BAR, DECO_MAXIMIZE, DECO_CLOSE };
+
+static bool view_has_deco(struct view* v)
+{
+#ifdef HAVE_XWAYLAND
+  struct wlr_xwayland_surface* xs = v->xsurface;
+  if (v->owner.type != OWNER_XWAYLAND || !v->c->x11_title_bars)
+    return false;
+  if (!xs || xs->override_redirect || v->fullscreen || v->nested)
+    return false;
+  /* _MOTIF_WM_HINTS asking for no title (e.g. own decorations) */
+  if (xs->decorations & WLR_XWAYLAND_SURFACE_DECORATIONS_NO_TITLE)
+    return false;
+  /* Windows with a parent (dialogs etc.) get one too, like most WMs */
+  return true;
+#else
+  (void)v;
+  return false;
+#endif
+}
+
+static void deco_update(struct view* v)
+{
+#ifdef HAVE_XWAYLAND
+  static const float bar_active[4] = { 0.20f, 0.33f, 0.53f, 1.0f };
+  static const float bar_inactive[4] = { 0.45f, 0.47f, 0.50f, 1.0f };
+  static const float button_max[4] = { 0.85f, 0.85f, 0.85f, 1.0f };
+  static const float button_close[4] = { 0.80f, 0.25f, 0.25f, 1.0f };
+  bool show = v->scene_tree && view_has_deco(v);
+  int w;
+
+  if (!show) {
+    if (v->deco)
+      wlr_scene_node_set_enabled(&v->deco->node, false);
+    return;
+  }
+
+  if (!v->deco) {
+    v->deco = wlr_scene_tree_create(v->scene_tree);
+    v->deco_bar = wlr_scene_rect_create(v->deco, 1, DECO_HEIGHT,
+                                        bar_active);
+    v->deco_buttons[0] = wlr_scene_rect_create(v->deco, DECO_HEIGHT - 8,
+                                               DECO_HEIGHT - 8, button_max);
+    v->deco_buttons[1] = wlr_scene_rect_create(v->deco, DECO_HEIGHT - 8,
+                                               DECO_HEIGHT - 8,
+                                               button_close);
+    for (int i = 0; i < 3; i++) {
+      v->deco_parts[i].owner.type = OWNER_DECO;
+      v->deco_parts[i].view = v;
+      v->deco_parts[i].kind = i;
+    }
+    v->deco_bar->node.data = &v->deco_parts[DECO_BAR];
+    v->deco_buttons[0]->node.data = &v->deco_parts[DECO_MAXIMIZE];
+    v->deco_buttons[1]->node.data = &v->deco_parts[DECO_CLOSE];
+  }
+
+  w = v->xsurface->width > 3 * DECO_HEIGHT ? v->xsurface->width :
+                                             3 * DECO_HEIGHT;
+  wlr_scene_node_set_enabled(&v->deco->node, true);
+  wlr_scene_node_set_position(&v->deco->node, 0, -DECO_HEIGHT);
+  wlr_scene_rect_set_size(v->deco_bar, w, DECO_HEIGHT);
+  wlr_scene_rect_set_color(v->deco_bar,
+                           v->activated ? bar_active : bar_inactive);
+  wlr_scene_node_set_position(&v->deco_buttons[1]->node,
+                              w - DECO_HEIGHT + 4, 4);
+  wlr_scene_node_set_position(&v->deco_buttons[0]->node,
+                              w - 2 * DECO_HEIGHT + 4, 4);
+#else
+  (void)v;
+#endif
+}
+
 static void view_maximize(struct view* v, bool maximize, bool fullscreen)
 {
   struct wvnc_compositor* c = v->c;
@@ -808,14 +901,21 @@ static void view_maximize(struct view* v, bool maximize, bool fullscreen)
   }
 #endif
 
-  if (v->fullscreen)
+  if (v->fullscreen) {
     view_set_box(v, &full);
-  else if (v->maximized)
+  } else if (v->maximized) {
+    /* Leave room for the title bar */
+    if (view_has_deco(v) && area.height > 2 * DECO_HEIGHT) {
+      area.y += DECO_HEIGHT;
+      area.height -= DECO_HEIGHT;
+    }
     view_set_box(v, &area);
+  }
   else if (was && v->saved.width > 0 && v->saved.height > 0)
     view_set_box(v, &v->saved);
   else if (was && v->owner.type == OWNER_XDG)
     wlr_xdg_toplevel_set_size(v->xdg, 0, 0);
+  deco_update(v);
 }
 
 /* Nested compositors ------------------------------------------------ */
@@ -1435,14 +1535,20 @@ static void xw_map(struct wl_listener* listener, void* data)
     return;
   }
 
-  if (xs->fullscreen)
+  if (xs->fullscreen) {
     view_maximize(v, false, true);
-  else if (xs->maximized_horz && xs->maximized_vert)
+  } else if (xs->maximized_horz && xs->maximized_vert) {
     view_maximize(v, true, false);
+  } else if (view_has_deco(v) && xs->y < DECO_HEIGHT) {
+    /* Keep the title bar on screen */
+    struct wlr_box box = { xs->x, DECO_HEIGHT, xs->width, xs->height };
+    view_set_box(v, &box);
+  }
 
   if (wlr_xwayland_surface_icccm_input_model(xs) !=
       WLR_ICCCM_INPUT_MODEL_NONE)
     focus_view(v);
+  deco_update(v);
 }
 
 static void xw_unmap(struct wl_listener* listener, void* data)
@@ -1461,6 +1567,7 @@ static void xw_unmap(struct wl_listener* listener, void* data)
   if (v->scene_tree) {
     wlr_scene_node_destroy(&v->scene_tree->node);
     v->scene_tree = NULL;
+    v->deco = NULL;   /* destroyed with its parent */
   }
   if (had_focus)
     focus_next_view(c);
@@ -1511,6 +1618,7 @@ static void xw_request_configure(struct wl_listener* listener, void* data)
                                  ev->width, ev->height);
   if (v->scene_tree)
     wlr_scene_node_set_position(&v->scene_tree->node, ev->x, ev->y);
+  deco_update(v);
 }
 
 static void xw_request_activate(struct wl_listener* listener, void* data)
@@ -1528,6 +1636,7 @@ static void xw_set_geometry(struct wl_listener* listener, void* data)
   if (v->scene_tree)
     wlr_scene_node_set_position(&v->scene_tree->node,
                                 v->xsurface->x, v->xsurface->y);
+  deco_update(v);
 }
 
 static void xw_request_move(struct wl_listener* listener, void* data)
@@ -1890,6 +1999,9 @@ static void process_grab_motion(struct wvnc_compositor* c)
   int dx = (int)(c->px - c->grab_x), dy = (int)(c->py - c->grab_y);
   struct wlr_box box = c->grab_box;
 
+  if (c->grab_mode == GRAB_DECO || !v)
+    return;
+
   if (c->grab_mode == GRAB_MOVE) {
     box.x += dx;
     box.y += dy;
@@ -1993,6 +2105,31 @@ static void notify_button(struct wvnc_compositor* c, uint32_t time,
               WL_POINTER_BUTTON_STATE_RELEASED);
 }
 
+static void deco_press(struct wvnc_compositor* c, struct deco_part* part,
+                       uint16_t mask)
+{
+#ifdef HAVE_XWAYLAND
+  struct view* v = part->view;
+  focus_view(v);
+  if (!(mask & 1))
+    return;   /* left button only */
+  switch (part->kind) {
+  case DECO_BAR:
+    c->button_mask = mask;   /* begin_grab wants a held button */
+    begin_grab(v, GRAB_MOVE, 0);
+    break;
+  case DECO_MAXIMIZE:
+    view_maximize(v, !v->maximized, false);
+    break;
+  case DECO_CLOSE:
+    wlr_xwayland_surface_close(v->xsurface);
+    break;
+  }
+#else
+  (void)c; (void)part; (void)mask;
+#endif
+}
+
 void wvnc_pointer_event(struct wvnc_compositor* c, int x, int y,
                         uint16_t mask)
 {
@@ -2015,7 +2152,18 @@ void wvnc_pointer_event(struct wvnc_compositor* c, int x, int y,
       (c->button_mask & 0x7) == 0) {
     double sx, sy;
     struct owner* owner;
-    struct wlr_surface* s = surface_at(c, c->px, c->py, &sx, &sy, &owner);
+    struct wlr_surface* s;
+    struct wlr_scene_node* node =
+      wlr_scene_node_at(&c->scene->tree.node, c->px, c->py, &sx, &sy);
+    if (node && node->type == WLR_SCENE_NODE_RECT && node->data &&
+        ((struct owner*)node->data)->type == OWNER_DECO) {
+      deco_press(c, node->data, mask);
+      c->button_mask = mask;
+      if (c->grab_mode == GRAB_NONE)
+        c->grab_mode = GRAB_DECO;   /* swallow until release */
+      goto buttons_done;
+    }
+    s = surface_at(c, c->px, c->py, &sx, &sy, &owner);
     focus_owner(c, owner, s);
     clear_implicit_grab(c);
     if (s) {
@@ -2026,6 +2174,7 @@ void wvnc_pointer_event(struct wvnc_compositor* c, int x, int y,
   }
 
   c->button_mask = mask;
+buttons_done:
 
   for (int i = 0; i < 3; i++) {
     if (!(changed & (1 << i)))
@@ -2863,6 +3012,7 @@ struct wvnc_compositor* wvnc_compositor_create(const struct wvnc_options* opts,
   c->width = opts->width;
   c->height = opts->height;
   c->nested_mode = opts->nested_mode;
+  c->x11_title_bars = opts->x11_title_bars;
   log_cb = &c->cb;
   c->usable_area = (struct wlr_box){ 0, 0, c->width, c->height };
   wl_list_init(&c->views);
