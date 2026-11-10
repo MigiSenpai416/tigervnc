@@ -1,5 +1,5 @@
 
-Tue Nov 10 12:23:24 2026
+Tue Nov 10 13:21:28 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-3.Xauthority
  Main:        Wayland display wayland-3 created in /tmp/wltest/xdg-runtime
@@ -10,7 +10,7 @@ Tue Nov 10 12:23:24 2026
 Xwayland glamor: GBM Wayland interfaces not available
 Failed to initialize glamor, falling back to sw
  WaylandDesktop: Xwayland ready on DISPLAY=:0
- Main:        Started session 'sh' (pid 90)
+ Main:        Started session 'sh' (pid 91)
  Main:        Session exited with status 3
  Main:        The display keeps running until the server is stopped
               (ExitWithSession is off)
@@ -22,28 +22,29 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::36662
- VNCSConnST:  Closing 127.0.0.1::36662: Clean disconnection
+
+Tue Nov 10 13:21:29 2026
+ Connections: Accepted: 127.0.0.1::53464
+ VNCSConnST:  Closing 127.0.0.1::53464: Clean disconnection
  EncodeManager: Framebuffer updates: 0
- EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::36662
+ Connections: Closed: 127.0.0.1::53464
 
-Tue Nov 10 12:23:28 2026
- Connections: Accepted: 127.0.0.1::56112
+Tue Nov 10 13:21:33 2026
+ Connections: Accepted: 127.0.0.1::53472
  SConnection: Client needs protocol version 3.8
- SConnection: Client requests security type VncAuth (2)
- VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
-              rgb888
- VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+ SConnection: Client requests security type VncAuth(2)
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
 
-Tue Nov 10 12:23:30 2026
+Tue Nov 10 13:21:34 2026
  Main:        Terminating
- VNCSConnST:  Closing 127.0.0.1::56112: Clean disconnection
+ VNCSConnST:  Closing 127.0.0.1::53472: Clean disconnection
  EncodeManager: Framebuffer updates: 1
  EncodeManager:   Raw:
  EncodeManager:     Solid: 5 rects, 307.2 kpixels
  EncodeManager:            1.17193 MiB (1:1 ratio)
- EncodeManager:   Total:: 5 rects, 307.2 kpixels
+ EncodeManager:   Total: 5 rects, 307.2 kpixels
  EncodeManager:          1.17193 MiB (1:1 ratio)
  Main:        Terminated

@@ -1,28 +1,25 @@
 
-Tue Nov 10 12:23:22 2026
+Tue Nov 10 13:21:27 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-7.Xauthority
  Main:        Wayland display wayland-7 created in /tmp/wltest/xdg-runtime
               (640x480)
- TcpSocket:   Failed to set TCP_NODELAY: 95
- TcpSocket:   Unknown address family
- TcpSocket:   Unknown address family
- Connections: Accepted: (N/A)::0
- TcpSocket:   Unknown address family
+ TcpSocket:   Unable to setsockopt TCP_NODELAY: 95
+ TcpSocket:   Unknown address family for socket
+ TcpSocket:   Unknown address family for socket
+ Connections: Accepted: ::0
+ TcpSocket:   Unknown address family for socket
  Main:        vncconfig control socket:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-7.vncconfig
  SConnection: Client needs protocol version 3.8
- SConnection: Client requests security type VncAuth (2)
- TcpSocket:   Unknown address family
- VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
-              rgb888
- VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+ SConnection: Client requests security type VncAuth(2)
+ TcpSocket:   Unknown address family for socket
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
 Xwayland glamor: GBM Wayland interfaces not available
 Failed to initialize glamor, falling back to sw
-
-Tue Nov 10 12:23:23 2026
  WaylandDesktop: Xwayland ready on DISPLAY=:0
- Main:        Started session 'sleep' (pid 82)
+ Main:        Started session 'sleep' (pid 83)
 The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Unsupported maximum keycode 708, clipping.
 >                   X11 cannot support keycodes above 255.
@@ -32,13 +29,13 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
 
-Tue Nov 10 12:23:24 2026
+Tue Nov 10 13:21:28 2026
  Main:        Terminating
- VNCSConnST:  Closing (N/A)::0: Clean disconnection
+ VNCSConnST:  Closing ::0: Clean disconnection
  EncodeManager: Framebuffer updates: 1
  EncodeManager:   Raw:
  EncodeManager:     Solid: 5 rects, 307.2 kpixels
  EncodeManager:            1.17193 MiB (1:1 ratio)
- EncodeManager:   Total:: 5 rects, 307.2 kpixels
+ EncodeManager:   Total: 5 rects, 307.2 kpixels
  EncodeManager:          1.17193 MiB (1:1 ratio)
  Main:        Terminated

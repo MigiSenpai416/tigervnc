@@ -1,37 +1,37 @@
 _XSERVTransmkdir: Owner of /tmp/.X11-unix should be set to root
 
-Xvnc TigerVNC 1.16.80 - built 2026-11-10 12:22
+Xvnc TigerVNC 1.16.2 - built Nov 10 2026 13:20:24
 Copyright (C) 1999-2026 TigerVNC team and many others (see README.rst)
 See https://www.tigervnc.org for information on TigerVNC.
 Underlying X server release 12101022
 
-Could not find any available render nodes
+Could not find any render nodes
 Failed to initialize DRI3 extension
 
-Tue Nov 10 12:22:37 2026
- vncext:      VNC extension running
- vncext:      Listening for VNC connections on local interfaces, port 5903
+Tue Nov 10 13:20:41 2026
+ vncext:      VNC extension running!
+ vncext:      Listening for VNC connections on local interface(s), port 5903
  vncext:      Created VNC server for screen 0
-[mi] mieq: warning: overriding existing handler (nil) with 0x55f54b4ebfc0 for event 2
-[mi] mieq: warning: overriding existing handler (nil) with 0x55f54b4ebfc0 for event 3
- Connections: Accepted: 127.0.0.1::43790
- VNCSConnST:  Closing 127.0.0.1::43790: Clean disconnection
+[mi] mieq: warning: overriding existing handler (nil) with 0x556396dffb00 for event 2
+[mi] mieq: warning: overriding existing handler (nil) with 0x556396dffb00 for event 3
+ Connections: Accepted: 127.0.0.1::58426
+ VNCSConnST:  Closing 127.0.0.1::58426: Clean disconnection
  EncodeManager: Framebuffer updates: 0
- EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::43790
- Connections: Accepted: 127.0.0.1::43794
+ Connections: Closed: 127.0.0.1::58426
+ Connections: Accepted: 127.0.0.1::58428
  SConnection: Client needs protocol version 3.8
- SConnection: Client requests security type VncAuth (2)
- VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
-              rgb888
- VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+ SConnection: Client requests security type VncAuth(2)
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
 
-Tue Nov 10 12:22:39 2026
- VNCSConnST:  Closing 127.0.0.1::43794: Clean disconnection
+Tue Nov 10 13:20:43 2026
+ VNCSConnST:  Closing 127.0.0.1::58428: Clean disconnection
  EncodeManager: Framebuffer updates: 1
  EncodeManager:   Raw:
  EncodeManager:     Solid: 8 rects, 480 kpixels
  EncodeManager:            1.83115 MiB (1:1 ratio)
- EncodeManager:   Total:: 8 rects, 480 kpixels
+ EncodeManager:   Total: 8 rects, 480 kpixels
  EncodeManager:          1.83115 MiB (1:1 ratio)
+ Connections: Closed: 127.0.0.1::58428

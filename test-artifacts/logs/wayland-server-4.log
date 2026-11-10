@@ -1,5 +1,5 @@
 
-Tue Nov 10 12:23:30 2026
+Tue Nov 10 13:21:34 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-4.Xauthority
  Main:        Wayland display wayland-4 created in /tmp/wltest/xdg-runtime
@@ -10,7 +10,7 @@ Tue Nov 10 12:23:30 2026
 Xwayland glamor: GBM Wayland interfaces not available
 Failed to initialize glamor, falling back to sw
  WaylandDesktop: Xwayland ready on DISPLAY=:0
- Main:        Started session 'sh' (pid 98)
+ Main:        Started session 'sh' (pid 99)
 The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Unsupported maximum keycode 708, clipping.
 >                   X11 cannot support keycodes above 255.
@@ -19,14 +19,14 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::37798
- VNCSConnST:  Closing 127.0.0.1::37798: Clean disconnection
+ Connections: Accepted: 127.0.0.1::43964
+ VNCSConnST:  Closing 127.0.0.1::43964: Clean disconnection
  EncodeManager: Framebuffer updates: 0
- EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::37798
+ Connections: Closed: 127.0.0.1::43964
 
-Tue Nov 10 12:23:33 2026
+Tue Nov 10 13:21:37 2026
  Main:        Session exited with status 0
  Main:        Terminating
 (EE) failed to read Wayland events: Broken pipe

@@ -1,5 +1,5 @@
 
-Tue Nov 10 12:24:23 2026
+Tue Nov 10 13:22:28 2026
  Main:        Xwayland authority file:
               /tmp/wltest/xdg-runtime/tigervnc-wayland-12.Xauthority
  Main:        Wayland display wayland-12 created in /tmp/wltest/xdg-runtime
@@ -10,7 +10,7 @@ Tue Nov 10 12:24:23 2026
 Xwayland glamor: GBM Wayland interfaces not available
 Failed to initialize glamor, falling back to sw
  WaylandDesktop: Xwayland ready on DISPLAY=:0
- Main:        Started session 'sh' (pid 265)
+ Main:        Started session 'sh' (pid 266)
 The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Unsupported maximum keycode 708, clipping.
 >                   X11 cannot support keycodes above 255.
@@ -19,53 +19,54 @@ The XKEYBOARD keymap compiler (xkbcomp) reports:
 > Warning:          Virtual modifier ScrollLock multiply defined
 >                   Using 0, ignoring 0
 Errors from xkbcomp are not fatal to the X server
- Connections: Accepted: 127.0.0.1::53626
- VNCSConnST:  Closing 127.0.0.1::53626: Clean disconnection
+ Connections: Accepted: 127.0.0.1::41498
+ VNCSConnST:  Closing 127.0.0.1::41498: Clean disconnection
  EncodeManager: Framebuffer updates: 0
- EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::53626
- Connections: Accepted: 127.0.0.1::53632
+ Connections: Closed: 127.0.0.1::41498
+ Connections: Accepted: 127.0.0.1::41510
  SConnection: Client needs protocol version 3.8
- SConnection: Client requests security type VncAuth (2)
- VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
-              rgb888
- VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
+ SConnection: Client requests security type VncAuth(2)
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
 
-Tue Nov 10 12:24:25 2026
+Tue Nov 10 13:22:29 2026
  ControlSocket: Parameter SendCutText changed by vncconfig
 
-Tue Nov 10 12:24:28 2026
+Tue Nov 10 13:22:32 2026
  ControlSocket: Parameter SendCutText changed by vncconfig
+
+Tue Nov 10 13:22:33 2026
  ControlSocket: Parameter desktop changed by vncconfig
- Connections: Accepted: 127.0.0.1::46160
+ Connections: Accepted: 127.0.0.1::41512
  SConnection: Client needs protocol version 3.8
- SConnection: Client requests security type VncAuth (2)
- VNCSConnST:  Server default pixel format: depth 24 (32bpp) little-endian
-              rgb888
- VNCSConnST:  Client pixel format: depth 24 (32bpp) little-endian rgb888
- VNCSConnST:  Closing 127.0.0.1::46160: Clean disconnection
+ SConnection: Client requests security type VncAuth(2)
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Closing 127.0.0.1::41512: Clean disconnection
  EncodeManager: Framebuffer updates: 0
- EncodeManager:   Total:: 0 rects, 0 pixels
+ EncodeManager:   Total: 0 rects, 0 pixels
  EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::46160
- ControlSocket: Reverse connection: 127.0.0.1:47201
- Connections: Accepted: 127.0.0.1::47201
- VNCSConnST:  Closing 127.0.0.1::47201: Clean disconnection
- EncodeManager: Framebuffer updates: 0
- EncodeManager:   Total:: 0 rects, 0 pixels
- EncodeManager:          0 B (1:-nan ratio)
- Connections: Closed: 127.0.0.1::47201
- ControlSocket: vncconfig QueryConnect prompt connected
-
-Tue Nov 10 12:24:30 2026
- ControlSocket: vncconfig QueryConnect prompt disconnected
- Main:        Terminating
- VNCSConnST:  Closing 127.0.0.1::53632: User requested disconnection
+ Connections: Closed: 127.0.0.1::41512
+ VNCSConnST:  Closing 127.0.0.1::41510: User requested disconnection
  EncodeManager: Framebuffer updates: 1
  EncodeManager:   Raw:
  EncodeManager:     Solid: 5 rects, 307.2 kpixels
  EncodeManager:            1.17193 MiB (1:1 ratio)
- EncodeManager:   Total:: 5 rects, 307.2 kpixels
+ EncodeManager:   Total: 5 rects, 307.2 kpixels
  EncodeManager:          1.17193 MiB (1:1 ratio)
+ Connections: Closed: 127.0.0.1::41510
+ ControlSocket: Reverse connection: 127.0.0.1:54193
+ Connections: Accepted: 127.0.0.1::54193
+ VNCSConnST:  Closing 127.0.0.1::54193: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::54193
+ ControlSocket: vncconfig QueryConnect prompt connected
+
+Tue Nov 10 13:22:35 2026
+ ControlSocket: vncconfig QueryConnect prompt disconnected
+ Main:        Terminating
  Main:        Terminated
