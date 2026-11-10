@@ -100,14 +100,13 @@ static bool getBoolParam(Display* dpy_, const char* param) {
       v.pop_back();
     return isTrue(v.c_str());
   }
+  // X11 mode: unchanged from stock TigerVNC 1.16.2
   char* data;
   int len;
-  bool ret = false;
   if (XVncExtGetParam(dpy_, param, &data, &len)) {
-    ret = isTrue(data);
-    XFree(data);
+    if (strcmp(data,"1") == 0) return true;
   }
-  return ret;
+  return false;
 }
 
 static void setParam(Display* dpy_, const char* param, const char* value) {
