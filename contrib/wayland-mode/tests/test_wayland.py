@@ -13,7 +13,9 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from harness import (Suite, wait_tcp, wait_file, sh, read_env_file,
                      find_colour_bbox, make_vnc_passwd, make_cert)
-from rfbclient import RFBClient, RFBError
+from rfbclient import RFBClient, RFBError, XK_TAB, XK_ESCAPE, XK_SHIFT_L
+
+XK_ALT_L = 0xffe9
 
 DISPLAY_NUM = 1
 PORT = 5900 + DISPLAY_NUM
@@ -570,7 +572,7 @@ def t_inetd():
 s.run("-inetd (connection on stdin/stdout)", t_inetd)
 
 
-def start_small(num, extra, session):
+def start_small(num, extra, session, env=None):
     import subprocess
     log = open(s.artifact("logs/wayland-server-%d.log" % num), "wb")
     return subprocess.Popen(["Xvnc", "--wayland", ":%d" % num,
@@ -578,7 +580,7 @@ def start_small(num, extra, session):
                              passwd, "-localhost", "-geometry",
                              "640x480"] + extra + ["--"] + session,
                             stdout=log, stderr=subprocess.STDOUT,
-                            env=base_env, start_new_session=True)
+                            env=env or base_env, start_new_session=True)
 
 
 def t_persist():
@@ -944,41 +946,69 @@ def misc_fixed_glyphs():
     return glyphs
 
 
-# 14x14 X11 title-bar buttons (DECO_BUTTON = DECO_HEIGHT-8). Backgrounds
-# match compositor.c (button_max 0.85, button_close 0.80/0.25/0.25);
-# glyphs are white (close) and #202020 (maximize / restore).
-BTN = 14
-MAX_BG = (217, 217, 217)
-CLOSE_BG = (204, 64, 64)
-GLYPH_DARK = (32, 32, 32)
+# X11 title-bar buttons, Windows 11 style (compositor.c: DECO_BTN_W 32,
+# DECO_GLYPH 10): minimize, maximize/restore, close; each a full-height
+# 32 px cell at the right of the bar with a thin 1 px glyph centred in it.
+# Cells are drawn only when hovered: lighter for minimize / maximize,
+# #c42b1c with a white glyph for close.
+BTN_W = 32
+BAR_ACTIVE = (51, 84, 135)
+HOVER_ACTIVE = (88, 115, 157)
+CLOSE_HOVER = (196, 43, 28)
+GLYPH_ACTIVE = (242, 242, 242)
 GLYPH_WHITE = (255, 255, 255)
+BUTTONS = ("min", "max", "close")
 
 
-def button_origin(g, which, T=22):
-    """Top-left of the maximize ('max') or close button for geometry g."""
+def button_cell(g, which, T=22):
+    """Top-left of the cell of button `which` for window geometry g."""
     x, y, w, _ = g
-    if which == "close":
-        return x + w - T + 4, y - T + 4
-    return x + w - 2 * T + 4, y - T + 4
+    return x + w - (3 - BUTTONS.index(which)) * BTN_W, y - T
 
 
-def button_colour_ok(c, bx, by, bg, glyph, min_glyph=20):
-    """Corners are the button colour (away from the glyph); enough pixels
-    match the glyph colour. Returns (ok, note)."""
-    corners = [(0, 0), (0, BTN - 1), (BTN - 1, 0), (BTN - 1, BTN - 1)]
-    for dx, dy in corners:
+def button_centre(g, which, T=22):
+    bx, by = button_cell(g, which, T)
+    return bx + BTN_W // 2, by + T // 2
+
+
+def button_ok(c, g, which, bg, glyph, min_glyph, max_glyph=60, T=22):
+    """The cell's corners are `bg`; the glyph (inside the centred 10x10
+    box only) has min_glyph..max_glyph pixels of `glyph`."""
+    bx, by = button_cell(g, which, T)
+    for dx, dy in ((1, 1), (BTN_W - 2, 1), (1, T - 2), (BTN_W - 2, T - 2)):
         px = c.pixel(bx + dx, by + dy)
         if not near(px, bg, 3):
-            return False, "corner %d,%d is %r, want ~%r" % (dx, dy, px, bg)
-    n = 0
-    for dy in range(BTN):
-        for dx in range(BTN):
-            px = c.pixel(bx + dx, by + dy)
-            if near(px, glyph, 3):
-                n += 1
-    if n < min_glyph:
-        return False, "only %d glyph pixels, want >= %d" % (n, min_glyph)
-    return True, "bg ~%r, %d glyph pixels" % (bg, n)
+            return False, "%s: cell corner %d,%d is %r, want ~%r" % \
+                (which, dx, dy, px, bg)
+    inside = outside = 0
+    for dy in range(T):
+        for dx in range(BTN_W):
+            if near(c.pixel(bx + dx, by + dy), glyph, 3):
+                if 11 <= dx < 21 and 6 <= dy < 16:
+                    inside += 1
+                else:
+                    outside += 1
+    if not (min_glyph <= inside <= max_glyph) or outside:
+        return False, "%s: %d glyph pixels in the glyph box (want %d..%d), " \
+            "%d outside" % (which, inside, min_glyph, max_glyph, outside)
+    return True, "%s: bg ~%r, %d glyph pixels" % (which, bg, inside)
+
+
+def x11_state(env, wid):
+    """'Normal', 'Iconic' or None from WM_STATE."""
+    rc, out = sh(["xprop", "-id", wid, "WM_STATE"], env=env)
+    for st in ("Normal", "Iconic", "Withdrawn"):
+        if "window state: " + st in out:
+            return st
+    return None
+
+
+def active_window(env):
+    rc, out = sh(["xprop", "-root", "_NET_ACTIVE_WINDOW"], env=env)
+    try:
+        return int(out.split()[-1], 16)
+    except (ValueError, IndexError):
+        return None
 
 
 def title_text_matches(c, g, T, text, glyphs):
@@ -1019,7 +1049,7 @@ def t_x11_title_bars():
         c = RFBClient(port=5911, security="VncAuth", password=PASSWORD)
         # sh: bash's prompt would set its own title
         xt = subprocess.Popen(["xterm", "-bg", "white", "-T", "Title Test 42",
-                               "-geometry", "30x8+100+100", "-e", "sh"],
+                               "-geometry", "40x8+100+100", "-e", "sh"],
                               env=env)
         rc, wid = sh(["xdotool", "search", "--sync", "--class", "XTerm"],
                      env=env, timeout=15)
@@ -1029,20 +1059,48 @@ def t_x11_title_bars():
         g = xwin_geometry(env, wid)
         shots.append(c.screenshot(s.artifact("wayland-17-x11-title-bar.png")))
         # between the title text and the buttons
-        bar = c.pixel(g[0] + g[2] - 2 * T - 4, g[1] - T // 2) if g else None
+        bar = c.pixel(g[0] + g[2] - 3 * BTN_W - 4, g[1] - T // 2) \
+            if g else None
         check(g is not None and near(bar, BAR, 3),
               "xterm at %r, title bar pixel %r" % (g, bar))
 
-        # button colours at the corners (away from the glyph) and glyph pixels
+        # three flat buttons: cells in the bar colour, thin light glyphs
+        # (minimize: a 10 px dash; maximize: a 10x10 box; close: an X)
         if g is not None:
             c.pointer(0, 0)
             c.refresh()
-            mx, my = button_origin(g, "max", T)
-            cx, cy = button_origin(g, "close", T)
-            ok_m, n_m = button_colour_ok(c, mx, my, MAX_BG, GLYPH_DARK)
-            ok_c, n_c = button_colour_ok(c, cx, cy, CLOSE_BG, GLYPH_WHITE)
-            check(ok_m, "maximize button: " + n_m)
-            check(ok_c, "close button: " + n_c)
+            shots.append(c.screenshot(s.artifact(
+                "wayland-17b-x11-buttons.png")))
+            for which, lo, hi in (("min", 10, 10), ("max", 36, 36),
+                                  ("close", 18, 20)):
+                r, n = button_ok(c, g, which, BAR_ACTIVE, GLYPH_ACTIVE,
+                                 lo, hi, T)
+                check(r, "normal " + n)
+            # hover: lighter cell (min, max), red cell + white X (close)
+            for which, bg, gl, lo, hi in (
+                    ("min", HOVER_ACTIVE, GLYPH_ACTIVE, 10, 10),
+                    ("max", HOVER_ACTIVE, GLYPH_ACTIVE, 36, 36),
+                    ("close", CLOSE_HOVER, GLYPH_WHITE, 18, 20)):
+                c.pointer(*button_centre(g, which, T))
+                time.sleep(0.3)
+                c.refresh()
+                if which == "close":
+                    shots.append(c.screenshot(s.artifact(
+                        "wayland-17c-x11-close-hover.png")))
+                r, n = button_ok(c, g, which, bg, gl, lo, hi, T)
+                check(r, "hovered " + n)
+                # the other cells stay flat
+                others = [b for b in BUTTONS if b != which]
+                flat = all(button_ok(c, g, o, BAR_ACTIVE,
+                                     GLYPH_ACTIVE, 1, 60, T)[0]
+                           for o in others)
+                check(flat, "hovering %s leaves %s flat" % (which, others))
+            c.pointer(0, 0)
+            time.sleep(0.3)
+            c.refresh()
+            r, n = button_ok(c, g, "close", BAR_ACTIVE, GLYPH_ACTIVE, 18,
+                             20, T)
+            check(r, "hover cleared when the pointer leaves: " + n)
 
         # title text: the window's title, pixel exact in misc-fixed 6x13
         m, bad = title_text_matches(c, g, T, "Title Test 42", glyphs)
@@ -1102,9 +1160,7 @@ def t_x11_title_bars():
               "+200,+150: %r" % (g2,))
 
         # maximize button (second from the right)
-        w = g2[2]
-        mx, my = g2[0] + w - 2 * T + T // 2, g2[1] - T // 2
-        c.click(mx, my)
+        c.click(*button_centre(g2, "max", T))
         time.sleep(1.5)
         g3 = xwin_geometry(env, wid)
         c.refresh()
@@ -1117,21 +1173,47 @@ def t_x11_title_bars():
         ok = ok and maxed
         if g3 is not None:
             c.pointer(0, 0)
+            time.sleep(0.3)
             c.refresh()
-            mx, my = button_origin(g3, "max", T)
-            ok_r, n_r = button_colour_ok(c, mx, my, MAX_BG, GLYPH_DARK)
-            check(ok_r, "restore glyph on maximized button: " + n_r)
+            # restore glyph: two overlapping boxes, more pixels than the
+            # maximize box
+            ok_r, n_r = button_ok(c, g3, "max", BAR_ACTIVE, GLYPH_ACTIVE,
+                                  38, 50, T)
+            check(ok_r, "restore glyph on the maximized window: " + n_r)
 
         # again: restore
-        c.click(g3[0] + g3[2] - 2 * T + T // 2, g3[1] - T // 2)
+        c.click(*button_centre(g3, "max", T))
         time.sleep(1.5)
         g4 = xwin_geometry(env, wid)
         restored = g4 is not None and g4 == g2
         notes.append("maximize again -> %r (want %r)" % (g4, g2))
         ok = ok and restored
 
+        # minimize button: the window is hidden and iconic in X11 terms
+        inside = (g4[0] + g4[2] // 2, g4[1] + g4[3] // 2)
+        c.click(*button_centre(g4, "min", T))
+        time.sleep(1)
+        c.refresh()
+        hidden = not near(c.pixel(*inside), (255, 255, 255), 8)
+        st = x11_state(env, wid)
+        shots.append(c.screenshot(s.artifact(
+            "wayland-19b-x11-minimized.png")))
+        check(hidden and st == "Iconic",
+              "minimize button: hidden=%s, WM_STATE %s" % (hidden, st))
+        # Alt+Tab (the only window) brings it back
+        c.key(XK_ALT_L, True)
+        c.tap(XK_TAB)
+        time.sleep(0.5)
+        c.key(XK_ALT_L, False)
+        time.sleep(1)
+        c.refresh()
+        shown = near(c.pixel(*inside), (255, 255, 255), 8)
+        st = x11_state(env, wid)
+        check(shown and st == "Normal" and xwin_geometry(env, wid) == g4,
+              "Alt+Tab restores it: shown=%s, WM_STATE %s" % (shown, st))
+
         # close button (rightmost): xterm gets WM_DELETE_WINDOW and exits
-        c.click(g4[0] + g4[2] - T // 2, g4[1] - T // 2)
+        c.click(*button_centre(g4, "close", T))
         try:
             xt.wait(5)
             closed = True
@@ -1151,9 +1233,327 @@ def t_x11_title_bars():
 
 
 s.run("X11 title bars: window title drawn as text (pixel exact, follows "
-      "renames), resize by edges and corners, drag moves, maximize/restore "
-      "and close buttons work, button colours and glyphs present",
+      "renames), resize by edges and corners, drag moves; minimize, "
+      "maximize/restore and close buttons (flat glyphs, hover colours) work",
       t_x11_title_bars)
+
+
+# Alt+Tab window switcher (compositor.c: SW_PAD 10, SW_ROW_H 44, SW_ICON 32)
+SW_BG = (43, 43, 43)
+SW_SEL = (74, 77, 82)
+SW_PAD, SW_ROW_H, SW_ICON = 10, 44, 32
+
+
+def switcher_box(c):
+    """(x0, y0, x1, y1) of the switcher popup, or None."""
+    return find_colour_bbox(c, SW_BG, tolerance=1, step=1, min_run=60)
+
+
+def switcher_rows(c, box, n):
+    """For n rows: (selected, icon centre pixel) of each row."""
+    x0, y0 = box[0] - 1, box[1] - 1       # bbox of the body; 1px outline
+    rows = []
+    for i in range(n):
+        ry = y0 + SW_PAD + i * SW_ROW_H
+        sel = near(c.pixel(x0 + SW_PAD + 3, ry + SW_ROW_H // 2), SW_SEL, 2)
+        icon = c.pixel(x0 + SW_PAD + 10 + SW_ICON // 2,
+                       ry + (SW_ROW_H - SW_ICON) // 2 + SW_ICON // 2)
+        rows.append((sel, icon))
+    return rows
+
+
+def alt_tab(c, taps=1, shift=False, release=True, shot=None):
+    c.key(XK_ALT_L, True)
+    if shift:
+        c.key(XK_SHIFT_L, True)
+    for _ in range(taps):
+        c.tap(XK_TAB)
+        time.sleep(0.15)
+    time.sleep(0.4)
+    c.refresh()
+    box = switcher_box(c)
+    if shot:
+        shot = c.screenshot(s.artifact(shot))
+    if shift:
+        c.key(XK_SHIFT_L, False)
+    if release:
+        c.key(XK_ALT_L, False)
+        time.sleep(0.8)
+        c.refresh()
+    return box, shot
+
+
+def t_switcher():
+    import subprocess
+    envf, sess = small_session(13)
+    p = start_small(13, ["-geometry", "800x600"], sess)
+    shots, notes = [], []
+    ok = True
+    procs = []
+
+    def check(cond, note):
+        nonlocal ok
+        ok = ok and bool(cond)
+        notes.append(("" if cond else "FAILED: ") + note)
+
+    # three xterms on top of each other; the colour at PROBE tells which
+    # one is on top
+    cols = {"A": (204, 34, 34), "B": (34, 170, 34), "C": (34, 68, 204)}
+    PROBE = (150, 120)
+
+    def top():
+        c.refresh()
+        px = c.pixel(*PROBE)
+        for k, v in cols.items():
+            if near(px, v, 6):
+                return k
+        return px
+
+    try:
+        wait_tcp(5913, timeout=20)
+        env = small_app_env(envf)
+        c = RFBClient(port=5913, security="VncAuth", password=PASSWORD)
+        wids = {}
+        for k in "ABC":
+            procs.append(subprocess.Popen(
+                ["xterm", "-bg", "#%02x%02x%02x" % cols[k], "-T", "SW-" + k,
+                 "-class", "SwTest" + k, "-geometry", "40x10+60+60",
+                 "-e", "sh"], env=env))
+            rc, out = sh(["xdotool", "search", "--sync", "--class",
+                          "SwTest" + k], env=env, timeout=15)
+            wids[k] = out.split()[0] if out.split() else "0"
+            time.sleep(0.8)
+        check(top() == "C", "C (newest) on top: %r" % (top(),))
+
+        # one tap: the popup lists C, B, A (MRU) with B selected
+        box, shot = alt_tab(c, 1, release=False,
+                            shot="wayland-26-switcher-popup.png")
+        shots.append(shot)
+        rows = switcher_rows(c, box, 3) if box else []
+        check(box is not None and [r[0] for r in rows] == [False, True, False],
+              "Alt+Tab: popup at %r, selection %r" % (box, [r[0] for r in rows]))
+        if box:
+            h = box[3] - box[1] + 3
+            check(h == 2 * SW_PAD + 3 * SW_ROW_H,
+                  "popup height %d for 3 windows" % h)
+            cx = (box[0] + box[2]) // 2
+            check(abs(cx - 400) <= 2, "popup centred (x %d)" % cx)
+        c.key(XK_ALT_L, False)
+        time.sleep(0.8)
+        check(top() == "B" and c.pixel(*PROBE) and switcher_box(c) is None,
+              "Alt released: B raised (%r), popup gone" % (top(),))
+        check(active_window(env) == int(wids["B"]),
+              "B focused (_NET_ACTIVE_WINDOW %r)" % active_window(env))
+
+        # MRU is now B, C, A: two taps select A
+        box, _ = alt_tab(c, 2)
+        check(top() == "A", "Alt+Tab+Tab: A raised (%r)" % (top(),))
+        # Alt+Shift+Tab goes backwards: from A, B, C the last one, C
+        box, _ = alt_tab(c, 1, shift=True)
+        check(top() == "C", "Alt+Shift+Tab: C raised (%r)" % (top(),))
+        # Tab wraps around: four taps on C, A, B select A
+        box, _ = alt_tab(c, 4)
+        check(top() == "A", "Alt+Tab x4 wraps: A raised (%r)" % (top(),))
+
+        # Esc cancels: nothing changes, focus stays on A
+        c.key(XK_ALT_L, True)
+        c.tap(XK_TAB)
+        time.sleep(0.3)
+        c.tap(XK_ESCAPE)
+        time.sleep(0.3)
+        c.refresh()
+        gone = switcher_box(c) is None
+        c.key(XK_ALT_L, False)
+        time.sleep(0.8)
+        check(gone and top() == "A" and active_window(env) == int(wids["A"]),
+              "Esc: popup closed=%s, A still on top and focused (%r)" %
+              (gone, top()))
+
+        # minimized windows are listed (at the end) and come back
+        rc, _ = sh(["xdotool", "windowminimize", wids["A"]], env=env)
+        time.sleep(1)
+        st = x11_state(env, wids["A"])
+        t = top()
+        check(st == "Iconic" and t != "A" and t in cols,
+              "client request (WM_CHANGE_STATE Iconic): A hidden, now %r "
+              "on top, WM_STATE %s" % (t, st))
+        check(active_window(env) == int(wids[t]) if t in wids else False,
+              "focus moved to %r" % (t,))
+        box, shot = alt_tab(c, 2, release=False,
+                            shot="wayland-27-switcher-minimized.png")
+        shots.append(shot)
+        rows = switcher_rows(c, box, 3) if box else []
+        check([r[0] for r in rows] == [False, False, True],
+              "popup lists the minimized window last, selected: %r" %
+              ([r[0] for r in rows],))
+        c.key(XK_ALT_L, False)
+        time.sleep(1)
+        st = x11_state(env, wids["A"])
+        check(top() == "A" and st == "Normal" and
+              active_window(env) == int(wids["A"]),
+              "Alt released: A un-minimized, raised, focused (WM_STATE %s)"
+              % st)
+
+        # a Wayland client's minimize request (foot's own minimize button)
+        foot = subprocess.Popen(["foot", "-W", "30x6"], env=env)
+        procs.append(foot)
+        fb = None
+        end = time.time() + 10
+        while time.time() < end and not fb:
+            time.sleep(0.5)
+            c.refresh()
+            fb = find_colour_bbox(c, FOOT_BG, min_run=50)
+        if fb:
+            time.sleep(1)
+            c.refresh()
+            fb = find_colour_bbox(c, FOOT_BG, min_run=50)
+            # foot's title bar (26 px) has close, maximize, minimize from
+            # the right, 26 px each
+            c.click(fb[2] - 26 * 2 - 13, fb[1] - 13)
+            time.sleep(1)
+            c.refresh()
+            shots.append(c.screenshot(s.artifact(
+                "wayland-28-foot-minimized.png")))
+            hidden = find_colour_bbox(c, FOOT_BG, min_run=50) is None
+            box, _ = alt_tab(c, 3)
+            back = find_colour_bbox(c, FOOT_BG, min_run=50) is not None
+            check(hidden and back,
+                  "foot (xdg request_minimize): hidden=%s, back after "
+                  "Alt+Tab x3=%s" % (hidden, back))
+        else:
+            check(False, "foot window not found")
+        c.close()
+    except Exception as e:
+        ok = False
+        notes.append("error: %r" % e)
+    finally:
+        for pr in procs:
+            pr.kill()
+        os.killpg(p.pid, 15)
+        p.wait(10)
+    return ok, "; ".join(notes), shots
+
+
+s.run("Alt+Tab window switcher: popup centred, MRU order, Tab / Shift+Tab / "
+      "wrap, Alt release raises and focuses, Esc cancels; minimize requests "
+      "(X11 WM_CHANGE_STATE, xdg request_minimize) hide windows that stay "
+      "listed and come back", t_switcher)
+
+
+def make_icon_theme(root):
+    """XDG_DATA_HOME with a PNG icon named in a .desktop file (found by
+    StartupWMClass) and an SVG icon named like a WM_CLASS."""
+    from PIL import Image
+    d = os.path.join(root, "icons/hicolor/48x48/apps")
+    os.makedirs(d, exist_ok=True)
+    Image.new("RGBA", (48, 48), (0, 200, 0, 255)).save(
+        os.path.join(d, "tvnc-test-green.png"))
+    d = os.path.join(root, "icons/hicolor/scalable/apps")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "tvnc-test-blue.svg"), "w") as f:
+        f.write('<svg xmlns="http://www.w3.org/2000/svg" width="48" '
+                'height="48"><rect x="0" y="0" width="48" height="48" '
+                'fill="#0000ff"/></svg>\n')
+    d = os.path.join(root, "applications")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "tvnc-png-test.desktop"), "w") as f:
+        f.write("[Desktop Entry]\nType=Application\nName=PNG test\n"
+                "Exec=true\nIcon=tvnc-test-green\n"
+                "StartupWMClass=TvncPngTest\n")
+
+
+def t_switcher_icons():
+    import subprocess
+    data = os.path.join(WORK, "icon-data")
+    make_icon_theme(data)
+    env0 = dict(base_env)
+    env0["XDG_DATA_HOME"] = data
+    envf, sess = small_session(14)
+    p = start_small(14, ["-geometry", "800x600"], sess, env=env0)
+    shots, notes = [], []
+    ok = True
+    procs = []
+
+    def check(cond, note):
+        nonlocal ok
+        ok = ok and bool(cond)
+        notes.append(("" if cond else "FAILED: ") + note)
+
+    try:
+        wait_tcp(5914, timeout=20)
+        env = small_app_env(envf)
+        c = RFBClient(port=5914, security="VncAuth", password=PASSWORD)
+        log = open(s.artifact("logs/wayland-server-14.log")).read()
+        check("icon formats PNG, SVG" in log,
+              "server log: %r" % [l.strip() for l in log.splitlines()
+                                  if "switcher" in l])
+
+        def xterm(cls, name, title):
+            procs.append(subprocess.Popen(
+                ["xterm", "-class", cls, "-name", name, "-T", title,
+                 "-geometry", "30x5+%d+40" % (40 + 60 * len(procs)),
+                 "-e", "sh"], env=env))
+            rc, out = sh(["xdotool", "search", "--sync", "--class", cls],
+                         env=env, timeout=15)
+            time.sleep(0.8)
+            return out.split()[0] if out.split() else "0"
+
+        # A: _NET_WM_ICON (7x7 red: xprop sets at most 64 values) beats
+        # the theme's xterm icon
+        wa = xterm("TvncNetIcon", "xterm", "icon-net")
+        rc, _ = sh(["xprop", "-id", wa, "-f", "_NET_WM_ICON", "32" + "c" * 51,
+                    "-set", "_NET_WM_ICON",
+                    ",".join(["7", "7"] + ["0xffff0000"] * 49)], env=env)
+        # B: PNG named by a .desktop file's Icon= (StartupWMClass match)
+        xterm("TvncPngTest", "tvncpng", "icon-png")
+        # C: SVG theme icon named like the WM_CLASS instance
+        xterm("TvncSvgTest", "tvnc-test-blue", "icon-svg")
+        # D: nothing: the built-in fallback icon
+        xterm("TvncNoIcon", "tvncnoicon", "icon-none")
+
+        box, shot = alt_tab(c, 1, release=False,
+                            shot="wayland-29-switcher-icons.png")
+        shots.append(shot)
+        rows = switcher_rows(c, box, 4) if box else []
+        icons = [r[1] for r in rows]
+        # MRU: D, C, B, A
+        want = [None, (0, 0, 255), (0, 200, 0), (255, 0, 0)]
+        for i, (name, w) in enumerate(zip(("fallback", "SVG", "PNG",
+                                           "_NET_WM_ICON"), want)):
+            got = icons[i] if i < len(icons) else None
+            if w is None:
+                good = got is not None and not near(got, SW_BG, 2) and \
+                    not near(got, SW_SEL, 2)
+            else:
+                good = near(got, w, 3)
+            check(good, "%s icon: row %d centre %r (want %r)" %
+                  (name, i, got, w or "drawn"))
+        # the whole 32x32 icon is filled for the scaled 7x7 one
+        if box:
+            x0, y0 = box[0] - 1, box[1] - 1
+            ry = y0 + SW_PAD + 3 * SW_ROW_H + (SW_ROW_H - SW_ICON) // 2
+            ix = x0 + SW_PAD + 10
+            red = sum(1 for y in range(SW_ICON) for x in range(SW_ICON)
+                      if near(c.pixel(ix + x, ry + y), (255, 0, 0), 3))
+            check(red == SW_ICON * SW_ICON,
+                  "_NET_WM_ICON 7x7 scaled to 32x32: %d red pixels" % red)
+        c.tap(XK_ESCAPE)
+        c.key(XK_ALT_L, False)
+        c.close()
+    except Exception as e:
+        ok = False
+        notes.append("error: %r" % e)
+    finally:
+        for pr in procs:
+            pr.kill()
+        os.killpg(p.pid, 15)
+        p.wait(10)
+    return ok, "; ".join(notes), shots
+
+
+s.run("Alt+Tab icons: _NET_WM_ICON first, then the icon theme (PNG via a "
+      ".desktop StartupWMClass, SVG by WM_CLASS), else a built-in icon",
+      t_switcher_icons)
 def t_vncconfig():
     import subprocess, stat
     envf, sess = small_session(12)

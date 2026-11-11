@@ -39,7 +39,8 @@ output * bg #3366aa solid_color
 default_border none
 for_window [app_id="nested-foot"] border none
 exec foot --app-id nested-foot bash --norc --noprofile
-"""
+bindsym Mod1+Tab exec echo yes > %s/alt-tab-in-sway
+""" % WORK
 
 
 def start(display, outputs, geometry="1024x768", extra=(), session=None):
@@ -222,6 +223,31 @@ def t_keyboard():
 
 s.run("keyboard input reaches a client of the nested compositor (foot "
       "in sway)", t_keyboard)
+
+
+def t_alt_tab():
+    # Alt+Tab belongs to the nested compositor (a sway key binding here);
+    # our window switcher stays out of it
+    flag = WORK + "/alt-tab-in-sway"
+    if os.path.exists(flag):
+        os.unlink(flag)
+    vnc.key(0xffe9, True)
+    vnc.tap(0xff09)
+    time.sleep(0.5)
+    vnc.refresh()
+    shot = vnc.screenshot(s.artifact("nested-02b-alt-tab.png"))
+    popup = fraction(vnc, (43, 43, 43), 0, 0, vnc.width, vnc.height)
+    vnc.key(0xffe9, False)
+    got = wait_file(flag, 5)
+    vnc.refresh()
+    f = fraction(vnc, FOOT_BG, 0, 0, vnc.width, vnc.height)
+    return got and popup == 0 and f > 0.9, \
+        ("sway's Mod1+Tab binding ran=%s; switcher popup pixels %.1f%%; "
+         "foot still fills %.0f%%" % (got, popup * 100, f * 100)), [shot]
+
+
+s.run("Alt+Tab goes to the nested compositor (sway binding runs), no "
+      "window switcher popup", t_alt_tab)
 
 
 def t_pointer():
