@@ -44,3 +44,26 @@ RUN if [ -n "$http_proxy" ]; then \
       python3 perl dbus dbus-x11 sudo procps psmisc libpam-modules \
       strace gdb less && \
     rm -rf /var/lib/apt/lists/*
+
+# Window switcher extras of the Wayland mode: FreeType (distro) and
+# lunasvg, which the distro does not package: built from its pinned
+# upstream release (static, with the plutovg it bundles) into /usr/local
+ARG LUNASVG_VERSION=3.5.0
+ARG LUNASVG_SHA256=1abf1472ee6c4d19797916e8cc3c2e4b628e0d81178ffac60bdb0d457e32c690
+RUN if [ -n "$http_proxy" ]; then \
+      printf 'Acquire::http::Proxy "%s";\nAcquire::https::Proxy "%s";\n' "$http_proxy" "${https_proxy:-$http_proxy}" > /etc/apt/apt.conf.d/80proxy; \
+    fi && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends libfreetype-dev curl && \
+    rm -rf /var/lib/apt/lists/* && \
+    cd /tmp && \
+    curl -fsSL -o lunasvg.tar.gz \
+      "https://github.com/sammycage/lunasvg/archive/refs/tags/v${LUNASVG_VERSION}.tar.gz" && \
+    echo "${LUNASVG_SHA256}  lunasvg.tar.gz" | sha256sum -c - && \
+    mkdir lunasvg && tar -xzf lunasvg.tar.gz -C lunasvg --strip-components=1 && \
+    cmake -S lunasvg -B lunasvg-build -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+      -DUSE_SYSTEM_PLUTOVG=OFF -DLUNASVG_BUILD_EXAMPLES=OFF \
+      -DLUNASVG_DISABLE_LOAD_SYSTEM_FONTS=ON -DCMAKE_INSTALL_PREFIX=/usr/local && \
+    cmake --build lunasvg-build -j"$(nproc)" && cmake --install lunasvg-build && \
+    rm -rf /tmp/lunasvg* /etc/apt/apt.conf.d/80proxy

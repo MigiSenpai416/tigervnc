@@ -57,9 +57,35 @@ add_executable(Xvnc-wayland
   nested_bridge.c
   WaylandServerDesktop.cxx
   parameters.cxx
+  wm_icons.c
+  wm_text.c
   xvnc-wayland.cxx
   ../w0vncserver/qnum_to_xorgevdev.c
 )
+
+# Window switcher extras (see the top level CMakeLists.txt)
+if(ENABLE_WAYLAND_PNG)
+  target_compile_definitions(Xvnc-wayland PRIVATE HAVE_LIBPNG)
+  target_link_libraries(Xvnc-wayland PRIVATE PkgConfig::WVNC_PNG)
+endif()
+if(ENABLE_WAYLAND_SVG)
+  target_sources(Xvnc-wayland PRIVATE icon_svg.cxx)
+  target_compile_definitions(Xvnc-wayland PRIVATE HAVE_LUNASVG)
+  target_link_libraries(Xvnc-wayland PRIVATE PkgConfig::WVNC_LUNASVG)
+  if(WVNC_PLUTOVG_FOUND)
+    target_link_libraries(Xvnc-wayland PRIVATE PkgConfig::WVNC_PLUTOVG)
+  endif()
+endif()
+if(ENABLE_WAYLAND_FREETYPE)
+  target_compile_definitions(Xvnc-wayland PRIVATE HAVE_FREETYPE)
+  target_link_libraries(Xvnc-wayland PRIVATE PkgConfig::WVNC_FREETYPE)
+endif()
+# TrueType font of the window switcher; packages may install one here
+# (e.g. DejaVu Sans), otherwise the usual distro locations are tried
+set(WVNC_FONT_FILE "${CMAKE_INSTALL_FULL_DATADIR}/tigervnc/fonts/DejaVuSans.ttf"
+  CACHE STRING "TrueType font file the Wayland mode window switcher tries first")
+target_compile_definitions(Xvnc-wayland PRIVATE
+  WVNC_FONT_FILE="${WVNC_FONT_FILE}")
 
 # Xwayland to run (default: "Xwayland" on PATH). Builds that bundle a
 # private Xwayland set this to its absolute path; it should match the
