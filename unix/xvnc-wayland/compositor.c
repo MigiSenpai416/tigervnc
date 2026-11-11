@@ -40,7 +40,9 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <math.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -84,6 +86,7 @@
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/types/wlr_xdg_toplevel_icon_v1.h>
 #include <wlr/util/box.h>
 #include <wlr/util/edges.h>
 #include <wlr/util/log.h>
@@ -91,6 +94,7 @@
 #ifdef HAVE_XWAYLAND
 #include <wlr/xwayland.h>
 #include <xcb/xcb.h>
+#include <xcb/xcbext.h>
 #endif
 
 #include <wlr/types/wlr_output_management_v1.h>
@@ -98,6 +102,8 @@
 
 #include "compositor.h"
 #include "nested_bridge.h"
+#include "wm_icons.h"
+#include "wm_text.h"
 
 extern const unsigned short code_map_qnum_to_xorgevdev[];
 extern const unsigned int code_map_qnum_to_xorgevdev_len;
@@ -117,6 +123,7 @@ extern const unsigned int code_map_qnum_to_xorgevdev_len;
 #define MAX_PRESSED_KEYS 64
 #define MAX_SCREENS 16
 #define MAX_SELECTION_SIZE (16 * 1024 * 1024)
+#define SWITCHER_MAX 64
 
 enum owner_type {
   OWNER_XDG,
@@ -204,6 +211,7 @@ struct wvnc_compositor {
   struct wlr_scene_tree* views_tree;
   struct wlr_scene_tree* unmanaged_tree;
   struct wlr_scene_tree* overlay_tree;
+  struct wlr_scene_tree* switcher_tree;   /* above everything */
   struct wlr_box usable_area;
 
   struct wlr_xdg_shell* xdg_shell;
@@ -277,6 +285,29 @@ struct wvnc_compositor {
   int num_screens; /* 0: one screen covering the framebuffer */
   unsigned int view_seq;
   struct nested_bridge* bridge;
+
+  /* X11 title bar button under the pointer (hover highlight) */
+  struct view* hover_view;
+  int hover_kind;
+
+  /* Application icons: xdg-toplevel-icon-v1, and our own X connection
+   * to Xwayland for _NET_WM_ICON */
+  struct wlr_xdg_toplevel_icon_manager_v1* icon_manager;
+  struct wl_listener set_icon;
+#ifdef HAVE_XWAYLAND
+  xcb_connection_t* icon_xcb;
+  bool icon_xcb_failed;
+  xcb_atom_t net_wm_icon;
+#endif
+
+  /* Alt+Tab window switcher */
+  struct {
+    bool active;
+    struct view* views[SWITCHER_MAX];   /* MRU order */
+    int n, sel;
+    struct view* prev;                  /* focused when it opened */
+    struct wlr_scene_buffer* buffer;
+  } sw;
 };
 
 struct view {
@@ -286,8 +317,14 @@ struct view {
   struct wlr_scene_tree* scene_tree;
   bool mapped;
   bool maximized, fullscreen;
+  bool minimized;       /* hidden, restorable through Alt+Tab */
   bool activated;
   struct wlr_box saved; /* geometry before maximize/fullscreen */
+  /* Switcher icon, resolved on demand; xdg_icon: what the client set
+   * through xdg-toplevel-icon-v1 */
+  struct wvnc_icon* icon;
+  bool icon_valid;
+  struct wlr_xdg_toplevel_icon_v1* xdg_icon;
   /* An output window of a nested compositor: it gets a whole screen,
    * stays at the bottom and can't be moved or resized */
   bool nested;
@@ -305,24 +342,26 @@ struct view {
   struct wl_listener request_resize;
   struct wl_listener request_maximize;
   struct wl_listener request_fullscreen;
+  struct wl_listener request_minimize;
+  struct wl_listener set_app_id;   /* xdg app_id / X11 WM_CLASS */
 
 #ifdef HAVE_XWAYLAND
   struct wlr_xwayland_surface* xsurface;
   /* Title bar for managed X11 windows */
   struct wlr_scene_tree* deco;
   struct wlr_scene_rect* deco_bar;
-  struct wlr_scene_rect* deco_buttons[2];   /* maximize, close */
+  struct wlr_scene_rect* deco_buttons[3];   /* minimize, maximize, close cells */
   struct wlr_scene_rect* deco_edges[4];     /* resize: top, bottom, l, r */
   struct wlr_scene_buffer* deco_title;
   char* deco_title_text;                    /* what deco_title shows */
   int deco_title_width;
-  struct wlr_scene_buffer* deco_icons[2];   /* maximize, close; on the buttons */
-  int deco_max_glyph;                       /* last max/restore glyph, or -1 */
+  struct wlr_scene_buffer* deco_icons[3];   /* glyphs on the cells */
+  uint64_t deco_icon_key[3];                /* glyph + colour drawn, or 0 */
   struct deco_part {
     struct owner owner;
     struct view* view;
     int kind;
-  } deco_parts[4];
+  } deco_parts[5];
   struct wl_listener set_title;
   struct wl_listener map_request;
   struct wl_listener associate;
@@ -655,7 +694,7 @@ static void focus_next_view(struct wvnc_compositor* c)
 {
   struct view* v;
   wl_list_for_each(v, &c->views, link) {
-    if (v->mapped) {
+    if (v->mapped && !v->minimized) {
 #ifdef HAVE_XWAYLAND
       if (v->owner.type == OWNER_XWAYLAND && v->xsurface->override_redirect)
         continue;
@@ -811,8 +850,10 @@ static void view_place(struct view* v)
 #define DECO_HEIGHT 22
 #define DECO_BORDER 5     /* invisible resize border around the frame */
 #define DECO_CORNER 16    /* corner zone along each edge */
-#define DECO_BUTTON (DECO_HEIGHT - 8)  /* 14x14 close / maximize buttons */
-enum { DECO_BAR, DECO_MAXIMIZE, DECO_CLOSE, DECO_EDGE };
+#define DECO_BTN_W 32     /* button cell width (full bar height) */
+#define DECO_GLYPH 10     /* glyph box, 1px strokes */
+#define DECO_MIN_W (3 * DECO_BTN_W + 24)
+enum { DECO_BAR, DECO_MINIMIZE, DECO_MAXIMIZE, DECO_CLOSE, DECO_EDGE };
 
 #include "deco_font.h"
 
@@ -835,8 +876,8 @@ static bool view_has_deco(struct view* v)
 #endif
 }
 
-#ifdef HAVE_XWAYLAND
-/* A wlr_buffer over malloc'ed ARGB8888 pixels, for the title text */
+/* A wlr_buffer over malloc'ed premultiplied ARGB8888 pixels (title
+ * text, button glyphs, the window switcher) */
 struct text_buffer {
   struct wlr_buffer base;
   uint32_t* data;
@@ -874,6 +915,23 @@ static const struct wlr_buffer_impl text_buffer_impl = {
   .end_data_ptr_access = text_buffer_end,
 };
 
+/* A transparent w x h pixel buffer to draw into; NULL on failure */
+static struct text_buffer* pixel_buffer_create(int w, int h)
+{
+  struct text_buffer* tb = calloc(1, sizeof(*tb));
+  if (!tb)
+    return NULL;
+  tb->stride = (size_t)w * 4;
+  tb->data = calloc((size_t)w * h, 4);
+  if (!tb->data) {
+    free(tb);
+    return NULL;
+  }
+  wlr_buffer_init(&tb->base, &text_buffer_impl, w, h);
+  return tb;
+}
+
+#ifdef HAVE_XWAYLAND
 /* Next code point of UTF-8 text; invalid bytes come out as '?' */
 static uint32_t utf8_next(const unsigned char** p)
 {
@@ -915,16 +973,10 @@ static struct wlr_buffer* render_title(const char* title, int max_w)
       cps[i] = '.';
   }
 
-  struct text_buffer* tb = calloc(1, sizeof(*tb));
   int w = (int)n * DECO_FONT_W, h = DECO_FONT_H;
+  struct text_buffer* tb = pixel_buffer_create(w, h);
   if (!tb)
     return NULL;
-  tb->stride = (size_t)w * 4;
-  tb->data = calloc((size_t)w * h, 4);
-  if (!tb->data) {
-    free(tb);
-    return NULL;
-  }
   for (size_t i = 0; i < n; i++)
     for (int y = 0; y < h; y++) {
       unsigned char bits = deco_font[cps[i]][y];
@@ -932,7 +984,6 @@ static struct wlr_buffer* render_title(const char* title, int max_w)
         if (bits & (0x80 >> x))
           tb->data[(size_t)y * w + i * DECO_FONT_W + x] = 0xffffffff;
     }
-  wlr_buffer_init(&tb->base, &text_buffer_impl, w, h);
   return &tb->base;
 }
 
@@ -940,7 +991,7 @@ static void deco_set_title(struct view* v, int w)
 {
   const char* title = v->xsurface->title ? v->xsurface->title : "";
   /* left of the buttons, with some padding */
-  int max_w = w - 2 * DECO_HEIGHT - 12;
+  int max_w = w - 3 * DECO_BTN_W - 12;
 
   if (v->deco_title_text && strcmp(v->deco_title_text, title) == 0 &&
       v->deco_title_width == max_w)
@@ -956,59 +1007,70 @@ static void deco_set_title(struct view* v, int w)
     wlr_buffer_drop(buf);   /* the scene buffer keeps a lock */
 }
 
-#define DECO_GLYPH_MAX 0
-#define DECO_GLYPH_RESTORE 1
-#define DECO_GLYPH_CLOSE 2
+/* Windows 11 style caption glyphs: 1px strokes in a 10x10 box */
+enum { GLYPH_MINIMIZE = 1, GLYPH_MAXIMIZE, GLYPH_RESTORE, GLYPH_CLOSE };
 
-/* 14x14 1-bit icons; 0x2000 is the leftmost pixel of each row. Close is a
- * 2px-stroke X; maximize is a square with a thicker top edge; restore is
- * two overlapping squares. Painted onto the existing coloured button rects. */
-static const uint16_t deco_glyphs[][DECO_BUTTON] = {
-  [DECO_GLYPH_MAX] = {
-    0x0000, 0x0000,
-    0x0FFC, 0x0FFC, 0x0804, 0x0804, 0x0804,
-    0x0804, 0x0804, 0x0804, 0x0804, 0x0FFC,
-    0x0000, 0x0000,
-  },
-  [DECO_GLYPH_RESTORE] = {
-    0x0000, 0x0000,
-    0x01FC, 0x01FC, 0x0104, 0x0FE4, 0x0FE4,
-    0x0824, 0x083C, 0x0820, 0x0820, 0x0FE0,
-    0x0000, 0x0000,
-  },
-  [DECO_GLYPH_CLOSE] = {
-    0x0000, 0x0000,
-    0x0C0C, 0x0E1C, 0x0738, 0x03F0, 0x01E0,
-    0x01E0, 0x03F0, 0x0738, 0x0E1C, 0x0C0C,
-    0x0000, 0x0000,
-  },
-};
-
-static struct wlr_buffer* render_glyph(int which, uint32_t colour)
+static void glyph_plot(uint32_t* px, int x, int y, uint32_t colour)
 {
-  struct text_buffer* tb = calloc(1, sizeof(*tb));
-  int w = DECO_BUTTON, h = DECO_BUTTON;
+  if (x >= 0 && x < DECO_GLYPH && y >= 0 && y < DECO_GLYPH)
+    px[y * DECO_GLYPH + x] = colour;
+}
+
+static void glyph_box(uint32_t* px, int x0, int y0, int x1, int y1,
+                      uint32_t colour)
+{
+  for (int x = x0; x <= x1; x++) {
+    glyph_plot(px, x, y0, colour);
+    glyph_plot(px, x, y1, colour);
+  }
+  for (int y = y0; y <= y1; y++) {
+    glyph_plot(px, x0, y, colour);
+    glyph_plot(px, x1, y, colour);
+  }
+}
+
+static struct wlr_buffer* render_glyph(int glyph, uint32_t colour)
+{
+  struct text_buffer* tb = pixel_buffer_create(DECO_GLYPH, DECO_GLYPH);
+  uint32_t* px;
+  const int L = DECO_GLYPH - 1;
   if (!tb)
     return NULL;
-  tb->stride = (size_t)w * 4;
-  tb->data = calloc((size_t)w * h, 4);
-  if (!tb->data) {
-    free(tb);
-    return NULL;
+  px = tb->data;
+  switch (glyph) {
+  case GLYPH_MINIMIZE:     /* a dash across the middle */
+    for (int x = 0; x <= L; x++)
+      glyph_plot(px, x, DECO_GLYPH / 2, colour);
+    break;
+  case GLYPH_MAXIMIZE:     /* a square */
+    glyph_box(px, 0, 0, L, L, colour);
+    break;
+  case GLYPH_RESTORE:      /* a square with another one behind it */
+    glyph_box(px, 0, 2, L - 2, L, colour);
+    for (int x = 2; x <= L; x++)
+      glyph_plot(px, x, 0, colour);
+    for (int y = 0; y <= L - 2; y++)
+      glyph_plot(px, L, y, colour);
+    glyph_plot(px, 2, 1, colour);
+    glyph_plot(px, L - 1, L - 2, colour);
+    break;
+  case GLYPH_CLOSE:        /* both diagonals */
+    for (int i = 0; i <= L; i++) {
+      glyph_plot(px, i, i, colour);
+      glyph_plot(px, L - i, i, colour);
+    }
+    break;
   }
-  for (int y = 0; y < h; y++) {
-    uint16_t bits = deco_glyphs[which][y];
-    for (int x = 0; x < w; x++)
-      if (bits & (0x2000 >> x))
-        tb->data[(size_t)y * w + x] = colour;
-  }
-  wlr_buffer_init(&tb->base, &text_buffer_impl, w, h);
   return &tb->base;
 }
 
-static void deco_set_icon(struct wlr_scene_buffer* node, int glyph,
-                          uint32_t colour)
+static void deco_set_icon(struct view* v, int i, int glyph, uint32_t colour)
 {
+  uint64_t key = ((uint64_t)glyph << 32) | colour;
+  struct wlr_scene_buffer* node = v->deco_icons[i];
+  if (v->deco_icon_key[i] == key)
+    return;
+  v->deco_icon_key[i] = key;
   struct wlr_buffer* buf = render_glyph(glyph, colour);
   wlr_scene_buffer_set_buffer(node, buf);
   wlr_scene_node_set_enabled(&node->node, buf != NULL);
@@ -1021,11 +1083,15 @@ static void deco_set_icon(struct wlr_scene_buffer* node, int glyph,
 static void deco_update(struct view* v)
 {
 #ifdef HAVE_XWAYLAND
+  /* Bar colours (focused, unfocused) and the lighter hover cells */
   static const float bar_active[4] = { 0.20f, 0.33f, 0.53f, 1.0f };
   static const float bar_inactive[4] = { 0.45f, 0.47f, 0.50f, 1.0f };
-  static const float button_max[4] = { 0.85f, 0.85f, 0.85f, 1.0f };
-  static const float button_close[4] = { 0.80f, 0.25f, 0.25f, 1.0f };
+  static const float hover_active[4] = { 0.345f, 0.451f, 0.616f, 1.0f };
+  static const float hover_inactive[4] = { 0.549f, 0.565f, 0.592f, 1.0f };
+  static const float close_hover[4] = { 0xc4 / 255.0f, 0x2b / 255.0f,
+                                        0x1c / 255.0f, 1.0f };
   static const float invisible[4] = { 0, 0, 0, 0 };
+  const uint32_t glyph_active = 0xfff2f2f2, glyph_inactive = 0xffd6d8dc;
   bool show = v->scene_tree && view_has_deco(v);
   int w, h;
 
@@ -1039,56 +1105,69 @@ static void deco_update(struct view* v)
     v->deco = wlr_scene_tree_create(v->scene_tree);
     v->deco_bar = wlr_scene_rect_create(v->deco, 1, DECO_HEIGHT,
                                         bar_active);
-    v->deco_buttons[0] = wlr_scene_rect_create(v->deco, DECO_BUTTON,
-                                               DECO_BUTTON, button_max);
-    v->deco_buttons[1] = wlr_scene_rect_create(v->deco, DECO_BUTTON,
-                                               DECO_BUTTON,
-                                               button_close);
+    for (int i = 0; i < 3; i++)
+      v->deco_buttons[i] = wlr_scene_rect_create(v->deco, DECO_BTN_W,
+                                                 DECO_HEIGHT, invisible);
     v->deco_title = wlr_scene_buffer_create(v->deco, NULL);
     for (int i = 0; i < 4; i++)
       v->deco_edges[i] = wlr_scene_rect_create(v->deco, 1, 1, invisible);
-    /* Icons sit above the button rects; node.data maps clicks to the button. */
-    v->deco_icons[0] = wlr_scene_buffer_create(v->deco, NULL);
-    v->deco_icons[1] = wlr_scene_buffer_create(v->deco, NULL);
-    deco_set_icon(v->deco_icons[1], DECO_GLYPH_CLOSE, 0xffffffff);
-    v->deco_max_glyph = -1;
-    for (int i = 0; i < 4; i++) {
+    /* Glyphs sit above the cells; node.data maps clicks to the button */
+    for (int i = 0; i < 3; i++) {
+      v->deco_icons[i] = wlr_scene_buffer_create(v->deco, NULL);
+      v->deco_icon_key[i] = 0;
+    }
+    for (int i = 0; i < 5; i++) {
       v->deco_parts[i].owner.type = OWNER_DECO;
       v->deco_parts[i].view = v;
       v->deco_parts[i].kind = i;
     }
     v->deco_bar->node.data = &v->deco_parts[DECO_BAR];
-    v->deco_buttons[0]->node.data = &v->deco_parts[DECO_MAXIMIZE];
-    v->deco_buttons[1]->node.data = &v->deco_parts[DECO_CLOSE];
-    v->deco_icons[0]->node.data = &v->deco_parts[DECO_MAXIMIZE];
-    v->deco_icons[1]->node.data = &v->deco_parts[DECO_CLOSE];
+    for (int i = 0; i < 3; i++) {
+      v->deco_buttons[i]->node.data = &v->deco_parts[DECO_MINIMIZE + i];
+      v->deco_icons[i]->node.data = &v->deco_parts[DECO_MINIMIZE + i];
+    }
     /* the title text belongs to the bar (drag, double click) */
     v->deco_title->node.data = &v->deco_parts[DECO_BAR];
     for (int i = 0; i < 4; i++)
       v->deco_edges[i]->node.data = &v->deco_parts[DECO_EDGE];
   }
 
-  w = v->xsurface->width > 3 * DECO_HEIGHT ? v->xsurface->width :
-                                             3 * DECO_HEIGHT;
+  w = v->xsurface->width > DECO_MIN_W ? v->xsurface->width : DECO_MIN_W;
   h = DECO_HEIGHT + v->xsurface->height;   /* frame height */
   wlr_scene_node_set_enabled(&v->deco->node, true);
   wlr_scene_node_set_position(&v->deco->node, 0, -DECO_HEIGHT);
   wlr_scene_rect_set_size(v->deco_bar, w, DECO_HEIGHT);
   wlr_scene_rect_set_color(v->deco_bar,
                            v->activated ? bar_active : bar_inactive);
-  int close_x = w - DECO_HEIGHT + 4, max_x = w - 2 * DECO_HEIGHT + 4;
-  wlr_scene_node_set_position(&v->deco_buttons[1]->node, close_x, 4);
-  wlr_scene_node_set_position(&v->deco_buttons[0]->node, max_x, 4);
-  wlr_scene_node_set_position(&v->deco_icons[1]->node, close_x, 4);
-  wlr_scene_node_set_position(&v->deco_icons[0]->node, max_x, 4);
+
+  /* minimize, maximize/restore, close from left to right */
+  int hover = v->c->hover_view == v ? v->c->hover_kind : -1;
+  for (int i = 0; i < 3; i++) {
+    int kind = DECO_MINIMIZE + i;
+    int cx = w - (3 - i) * DECO_BTN_W;
+    int glyph = kind == DECO_MINIMIZE ? GLYPH_MINIMIZE :
+                kind == DECO_CLOSE ? GLYPH_CLOSE :
+                v->maximized ? GLYPH_RESTORE : GLYPH_MAXIMIZE;
+    uint32_t colour = v->activated ? glyph_active : glyph_inactive;
+    const float* cell = invisible;
+    if (hover == kind) {
+      if (kind == DECO_CLOSE) {
+        cell = close_hover;
+        colour = 0xffffffff;
+      } else {
+        cell = v->activated ? hover_active : hover_inactive;
+      }
+    }
+    wlr_scene_rect_set_color(v->deco_buttons[i], cell);
+    wlr_scene_node_set_position(&v->deco_buttons[i]->node, cx, 0);
+    wlr_scene_node_set_position(&v->deco_icons[i]->node,
+                                cx + (DECO_BTN_W - DECO_GLYPH) / 2,
+                                (DECO_HEIGHT - DECO_GLYPH) / 2);
+    deco_set_icon(v, i, glyph, colour);
+  }
   wlr_scene_node_set_position(&v->deco_title->node, 6,
                               (DECO_HEIGHT - DECO_FONT_H) / 2);
   deco_set_title(v, w);
-  int want = v->maximized ? DECO_GLYPH_RESTORE : DECO_GLYPH_MAX;
-  if (v->deco_max_glyph != want) {
-    v->deco_max_glyph = want;
-    deco_set_icon(v->deco_icons[0], want, 0xff202020);
-  }
 
   /* Resize borders, no resizing when maximized (like moving) */
   bool resizable = !v->maximized;
@@ -1106,6 +1185,21 @@ static void deco_update(struct view* v)
 #else
   (void)v;
 #endif
+}
+
+/* The title bar button under the pointer changed */
+static void set_deco_hover(struct wvnc_compositor* c, struct view* v,
+                           int kind)
+{
+  struct view* old = c->hover_view;
+  if (old == v && c->hover_kind == kind)
+    return;
+  c->hover_view = v;
+  c->hover_kind = kind;
+  if (old && old != v)
+    deco_update(old);
+  if (v)
+    deco_update(v);
 }
 
 #ifdef HAVE_XWAYLAND
@@ -1197,6 +1291,595 @@ static void view_maximize(struct view* v, bool maximize, bool fullscreen)
   else if (was && v->owner.type == OWNER_XDG)
     wlr_xdg_toplevel_set_size(v->xdg, 0, 0);
   deco_update(v);
+}
+
+/* Minimize ----------------------------------------------------------- */
+
+static void clear_implicit_grab(struct wvnc_compositor* c);
+
+static void switcher_view_gone(struct view* v);
+
+static bool view_is_child(struct view* v)
+{
+  if (v->owner.type == OWNER_XDG)
+    return v->xdg->parent != NULL;
+#ifdef HAVE_XWAYLAND
+  return v->xsurface->parent != NULL;
+#else
+  return false;
+#endif
+}
+
+/* Hides a window (or shows it again). The window keeps its place in
+ * the focus (MRU) list, at the back while minimized, and comes back
+ * through the window switcher, a click on nothing else being
+ * possible: there is no task bar. */
+static void view_set_minimized(struct view* v, bool minimized)
+{
+  struct wvnc_compositor* c = v->c;
+
+  if (v->nested || !v->mapped || v->minimized == minimized) {
+#ifdef HAVE_XWAYLAND
+    /* keep the X11 iconic state truthful even when nothing changes */
+    if (v->owner.type == OWNER_XWAYLAND && v->mapped &&
+        !v->xsurface->override_redirect)
+      wlr_xwayland_surface_set_minimized(v->xsurface, v->minimized);
+#endif
+    return;
+  }
+#ifdef HAVE_XWAYLAND
+  if (v->owner.type == OWNER_XWAYLAND && v->xsurface->override_redirect)
+    return;
+#endif
+
+  v->minimized = minimized;
+  if (v->scene_tree)
+    wlr_scene_node_set_enabled(&v->scene_tree->node, !minimized);
+#ifdef HAVE_XWAYLAND
+  if (v->owner.type == OWNER_XWAYLAND)
+    wlr_xwayland_surface_set_minimized(v->xsurface, minimized);
+#endif
+
+  if (minimized) {
+    bool had_focus = focused_view(c) == v;
+    if (c->grab_view == v) {
+      c->grab_mode = GRAB_NONE;
+      c->grab_view = NULL;
+    }
+    if (c->hover_view == v)
+      c->hover_view = NULL;
+    if (c->implicit_grab == view_surface(v))
+      clear_implicit_grab(c);
+    /* to the back of the focus order */
+    wl_list_remove(&v->link);
+    wl_list_insert(c->views.prev, &v->link);
+    if (had_focus) {
+      view_set_activated(v, false);
+      focus_next_view(c);
+    }
+  } else {
+    focus_view(v);
+  }
+}
+
+/* Window switcher (Alt+Tab) ------------------------------------------ */
+
+/*
+ * Hold Alt and press Tab: a popup in the middle of the screen lists the
+ * windows (most recently used first, minimized ones too), Tab and
+ * Shift+Tab move the selection, releasing Alt raises, focuses and
+ * un-minimizes the selected window, Esc closes the popup without
+ * changing anything. While it is open the keyboard belongs to the
+ * compositor (no client has keyboard focus). If a nested compositor
+ * has the keyboard, Alt+Tab is its business and is passed on.
+ */
+
+#define SW_ICON 32
+#define SW_PAD 10
+#define SW_ROW_H 44
+#define SW_RADIUS 10
+#define SW_ROW_RADIUS 6
+#define SW_TEXT_PX 15
+#define SW_MIN_W 360
+#define SW_MAX_W 720
+static const uint32_t sw_bg = 0xff2b2b2b;           /* popup */
+static const uint32_t sw_sel = 0xff4a4d52;          /* selected row */
+static const uint32_t sw_border = 0xff5a5d63;       /* popup outline */
+static const uint32_t sw_text = 0xffffff;
+static const uint32_t sw_text_min = 0xa8a8a8;       /* minimized */
+
+static const char* view_title(struct view* v)
+{
+  const char* t = NULL;
+  if (v->owner.type == OWNER_XDG) {
+    t = v->xdg->title;
+    if (!t || !*t)
+      t = v->xdg->app_id;
+  }
+#ifdef HAVE_XWAYLAND
+  else {
+    t = v->xsurface->title;
+    if (!t || !*t)
+      t = v->xsurface->class;
+  }
+#endif
+  return t && *t ? t : "(untitled)";
+}
+
+#ifdef HAVE_XWAYLAND
+/* Our own X connection to Xwayland, for reading window properties
+ * without disturbing wlroots' window manager connection. Uses the
+ * same MIT-MAGIC-COOKIE-1 as the session (TIGERVNC_XWAYLAND_AUTH). */
+static bool read_cookie(const char* path, const char* display,
+                        char* cookie, int* cookie_len)
+{
+  unsigned char buf[4096];
+  const char* num = display[0] == ':' ? display + 1 : display;
+  size_t n, off = 0;
+  FILE* f = fopen(path, "rb");
+  if (!f)
+    return false;
+  n = fread(buf, 1, sizeof(buf), f);
+  fclose(f);
+  while (off + 2 <= n) {
+    const unsigned char* field[4];
+    size_t len[4];
+    off += 2;   /* family */
+    for (int i = 0; i < 4; i++) {
+      if (off + 2 > n)
+        return false;
+      len[i] = ((size_t)buf[off] << 8) | buf[off + 1];
+      off += 2;
+      if (off + len[i] > n)
+        return false;
+      field[i] = buf + off;
+      off += len[i];
+    }
+    if (len[1] == strlen(num) && memcmp(field[1], num, len[1]) == 0 &&
+        len[2] == 18 && memcmp(field[2], "MIT-MAGIC-COOKIE-1", 18) == 0 &&
+        len[3] <= 64) {
+      memcpy(cookie, field[3], len[3]);
+      *cookie_len = (int)len[3];
+      return true;
+    }
+  }
+  return false;
+}
+
+static xcb_connection_t* icon_connection(struct wvnc_compositor* c)
+{
+  const char* display;
+  const char* auth = getenv("TIGERVNC_XWAYLAND_AUTH");
+  xcb_connection_t* conn;
+
+  if (c->icon_xcb || c->icon_xcb_failed || !c->xwayland)
+    return c->icon_xcb;
+  display = c->xwayland->display_name;
+  if (!display || !*display)
+    return NULL;
+  if (auth && *auth) {
+    char cookie[64];
+    char name[] = "MIT-MAGIC-COOKIE-1";
+    xcb_auth_info_t info = { 18, name, 0, cookie };
+    if (!read_cookie(auth, display, cookie, &info.datalen)) {
+      c->icon_xcb_failed = true;
+      return NULL;
+    }
+    conn = xcb_connect_to_display_with_auth_info(display, &info, NULL);
+  } else {
+    conn = xcb_connect(display, NULL);
+  }
+  if (!conn || xcb_connection_has_error(conn)) {
+    if (conn)
+      xcb_disconnect(conn);
+    c->icon_xcb_failed = true;
+    wvnc_log_info("Window switcher: cannot connect to Xwayland for X11 "
+                  "window icons");
+    return NULL;
+  }
+  c->icon_xcb = conn;
+  return conn;
+}
+
+/* Waits (at most until deadline_ms) for the reply to a request on our
+ * icon connection. Never blocks for good: Xwayland is our client, so
+ * it may itself be waiting for us. */
+static void* icon_wait_reply(xcb_connection_t* conn, unsigned int seq,
+                             uint32_t deadline_ms)
+{
+  for (;;) {
+    void* reply = NULL;
+    xcb_generic_error_t* err = NULL;
+    xcb_generic_event_t* ev;
+    struct pollfd pfd = { xcb_get_file_descriptor(conn), POLLIN, 0 };
+    if (xcb_poll_for_reply(conn, seq, &reply, &err)) {
+      free(err);
+      return reply;
+    }
+    while ((ev = xcb_poll_for_event(conn)))   /* also reads the socket */
+      free(ev);
+    if (xcb_poll_for_reply(conn, seq, &reply, &err)) {
+      free(err);
+      return reply;
+    }
+    if (xcb_connection_has_error(conn))
+      return NULL;
+    int left = (int)(deadline_ms - now_msec());
+    if (left <= 0 || poll(&pfd, 1, left) <= 0)
+      return NULL;
+  }
+}
+
+static struct wvnc_icon* net_wm_icon(struct wvnc_compositor* c,
+                                     struct view* v)
+{
+  xcb_connection_t* conn = icon_connection(c);
+  uint32_t deadline = now_msec() + 250;
+  struct wvnc_icon* icon = NULL;
+
+  if (!conn)
+    return NULL;
+  if (c->net_wm_icon == XCB_ATOM_NONE) {
+    xcb_intern_atom_cookie_t ck =
+      xcb_intern_atom(conn, 0, strlen("_NET_WM_ICON"), "_NET_WM_ICON");
+    xcb_flush(conn);
+    xcb_intern_atom_reply_t* r = icon_wait_reply(conn, ck.sequence, deadline);
+    if (!r)
+      return NULL;
+    c->net_wm_icon = r->atom;
+    free(r);
+  }
+  /* up to 1 MiB of icon data */
+  xcb_get_property_cookie_t ck =
+    xcb_get_property(conn, 0, v->xsurface->window_id, c->net_wm_icon,
+                     XCB_ATOM_CARDINAL, 0, 256 * 1024);
+  xcb_flush(conn);
+  xcb_get_property_reply_t* r = icon_wait_reply(conn, ck.sequence, deadline);
+  if (!r)
+    return NULL;
+  if (r->format == 32 && r->type == XCB_ATOM_CARDINAL)
+    icon = wvnc_icon_from_net_wm_icon(xcb_get_property_value(r),
+                                      (size_t)xcb_get_property_value_length(r) / 4,
+                                      SW_ICON);
+  free(r);
+  return icon;
+}
+#endif
+
+/* An xdg-toplevel-icon-v1 icon: the buffer nearest our size, else its
+ * theme icon name */
+static struct wvnc_icon* xdg_toplevel_icon(struct wlr_xdg_toplevel_icon_v1* ti)
+{
+  struct wlr_xdg_toplevel_icon_v1_buffer* b;
+  struct wlr_xdg_toplevel_icon_v1_buffer* best = NULL;
+  struct wvnc_icon* icon = NULL;
+  int best_d = 0;
+
+  wl_list_for_each(b, &ti->buffers, link) {
+    int d = b->buffer->width - SW_ICON * (b->scale > 0 ? b->scale : 1);
+    if (d < 0)
+      d = -2 * d;   /* prefer scaling down */
+    if (!best || d < best_d) {
+      best = b;
+      best_d = d;
+    }
+  }
+  if (best) {
+    void* data;
+    uint32_t format;
+    size_t stride;
+    if (wlr_buffer_begin_data_ptr_access(best->buffer,
+                                         WLR_BUFFER_DATA_PTR_ACCESS_READ,
+                                         &data, &format, &stride)) {
+      if (format == DRM_FORMAT_ARGB8888 || format == DRM_FORMAT_XRGB8888) {
+        int w = best->buffer->width, h = best->buffer->height;
+        uint32_t* px = malloc((size_t)w * h * 4);
+        if (px) {
+          for (int y = 0; y < h; y++) {
+            memcpy(px + (size_t)y * w, (uint8_t*)data + y * stride,
+                   (size_t)w * 4);
+            if (format == DRM_FORMAT_XRGB8888)
+              for (int x = 0; x < w; x++)
+                px[(size_t)y * w + x] |= 0xff000000;
+          }
+          icon = wvnc_icon_from_argb(px, w, h, w, true, SW_ICON);
+          free(px);
+        }
+      }
+      wlr_buffer_end_data_ptr_access(best->buffer);
+    }
+  }
+  if (!icon && ti->name)
+    icon = wvnc_icon_for_name(ti->name, SW_ICON);
+  return icon;
+}
+
+/* The icon shown for a window: what the client provides, then the
+ * icon theme entry of its application, then a generic one */
+static struct wvnc_icon* view_icon(struct view* v)
+{
+  struct wvnc_icon* icon = NULL;
+  if (v->icon_valid)
+    return v->icon;
+
+  if (v->owner.type == OWNER_XDG) {
+    if (v->xdg_icon)
+      icon = xdg_toplevel_icon(v->xdg_icon);
+    if (!icon && v->xdg->app_id) {
+      const char* ids[] = { v->xdg->app_id };
+      icon = wvnc_icon_for_app(ids, 1, SW_ICON);
+    }
+  }
+#ifdef HAVE_XWAYLAND
+  else {
+    icon = net_wm_icon(v->c, v);
+    if (!icon) {
+      const char* ids[] = { v->xsurface->class, v->xsurface->instance };
+      icon = wvnc_icon_for_app(ids, 2, SW_ICON);
+    }
+  }
+#endif
+  if (!icon)
+    icon = wvnc_icon_fallback(SW_ICON);
+  wvnc_icon_unref(v->icon);
+  v->icon = icon;
+  v->icon_valid = true;
+  return icon;
+}
+
+static void view_icon_changed(struct view* v)
+{
+  wvnc_icon_unref(v->icon);
+  v->icon = NULL;
+  v->icon_valid = false;
+}
+
+/* Coverage (0..255) of a rounded rectangle at pixel (x, y), for
+ * anti-aliased corners */
+static unsigned round_cov(int x, int y, int w, int h, int r)
+{
+  double cx, cy, d;
+  if (x >= r && x < w - r)
+    return 255;
+  if (y >= r && y < h - r)
+    return 255;
+  cx = x < r ? r - 0.5 : w - r - 0.5;
+  cy = y < r ? r - 0.5 : h - r - 0.5;
+  d = sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+  if (d <= r - 1)
+    return 255;
+  if (d >= r)
+    return 0;
+  return (unsigned)((r - d) * 255);
+}
+
+static uint32_t scale_px(uint32_t p, unsigned cov)
+{
+  if (cov >= 255)
+    return p;
+  uint32_t a = (p >> 24) * cov / 255, r = ((p >> 16) & 0xff) * cov / 255,
+           g = ((p >> 8) & 0xff) * cov / 255, b = (p & 0xff) * cov / 255;
+  return (a << 24) | (r << 16) | (g << 8) | b;
+}
+
+static void over(uint32_t* d, uint32_t s)
+{
+  uint32_t sa = s >> 24, inv = 255 - sa;
+  if (sa == 255) { *d = s; return; }
+  if (sa == 0 && s == 0) return;
+  uint32_t o = *d;
+  uint32_t a = sa + (o >> 24) * inv / 255;
+  uint32_t r = ((s >> 16) & 0xff) + ((o >> 16) & 0xff) * inv / 255;
+  uint32_t g = ((s >> 8) & 0xff) + ((o >> 8) & 0xff) * inv / 255;
+  uint32_t b = (s & 0xff) + (o & 0xff) * inv / 255;
+  if (r > 255) r = 255;
+  if (g > 255) g = 255;
+  if (b > 255) b = 255;
+  *d = (a << 24) | (r << 16) | (g << 8) | b;
+}
+
+static void fill_round(uint32_t* px, int stride, int x0, int y0, int w,
+                       int h, int r, uint32_t colour)
+{
+  for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++) {
+      unsigned cov = round_cov(x, y, w, h, r);
+      if (cov)
+        over(&px[(size_t)(y0 + y) * stride + x0 + x], scale_px(colour, cov));
+    }
+}
+
+static void switcher_render(struct wvnc_compositor* c)
+{
+  struct wlr_box screen = screen_at(c, c->px, c->py);
+  int text_x = SW_PAD + 10 + SW_ICON + 12;
+  int max_text = 0, w, h, rows, first;
+  struct text_buffer* tb;
+
+  wvnc_text_init(SW_TEXT_PX);
+
+  /* Size: the widest title, within limits and the screen */
+  int limit = SW_MAX_W < screen.width - 40 ? SW_MAX_W : screen.width - 40;
+  for (int i = 0; i < c->sw.n; i++) {
+    int tw = wvnc_text_width(view_title(c->sw.views[i]), 10000);
+    if (tw > max_text)
+      max_text = tw;
+  }
+  w = text_x + max_text + SW_PAD + 14;
+  if (w < SW_MIN_W) w = SW_MIN_W;
+  if (w > limit) w = limit;
+  if (w < 120) w = 120;
+  rows = c->sw.n;
+  int max_rows = (screen.height - 40 - 2 * SW_PAD) / SW_ROW_H;
+  if (max_rows < 1) max_rows = 1;
+  if (rows > max_rows) rows = max_rows;
+  /* scroll so that the selection is visible */
+  first = 0;
+  if (c->sw.sel >= rows)
+    first = c->sw.sel - rows + 1;
+  h = 2 * SW_PAD + rows * SW_ROW_H;
+
+  tb = pixel_buffer_create(w, h);
+  if (!tb)
+    return;
+  /* outline, then the body 1px inside it */
+  fill_round(tb->data, w, 0, 0, w, h, SW_RADIUS, sw_border);
+  for (int y = 1; y < h - 1; y++)
+    for (int x = 1; x < w - 1; x++)
+      if (round_cov(x - 1, y - 1, w - 2, h - 2, SW_RADIUS - 1) == 255)
+        tb->data[(size_t)y * w + x] = sw_bg;
+      else if (round_cov(x - 1, y - 1, w - 2, h - 2, SW_RADIUS - 1))
+        over(&tb->data[(size_t)y * w + x],
+             scale_px(sw_bg, round_cov(x - 1, y - 1, w - 2, h - 2,
+                                       SW_RADIUS - 1)));
+
+  for (int r = 0; r < rows; r++) {
+    int i = first + r;
+    struct view* v = c->sw.views[i];
+    int ry = SW_PAD + r * SW_ROW_H;
+    struct wvnc_icon* icon = view_icon(v);
+    if (i == c->sw.sel)
+      fill_round(tb->data, w, SW_PAD, ry, w - 2 * SW_PAD, SW_ROW_H,
+                 SW_ROW_RADIUS, sw_sel);
+    if (icon) {
+      int ix = SW_PAD + 10, iy = ry + (SW_ROW_H - SW_ICON) / 2;
+      for (int y = 0; y < SW_ICON && y < icon->size; y++)
+        for (int x = 0; x < SW_ICON && x < icon->size; x++)
+          over(&tb->data[(size_t)(iy + y) * w + ix + x],
+               icon->px[(size_t)y * icon->size + x]);
+    }
+    int ty = ry + (SW_ROW_H - wvnc_text_line_height()) / 2;
+    wvnc_text_draw(tb->data, w, h, w, text_x, ty, view_title(v),
+                   w - text_x - SW_PAD - 12,
+                   v->minimized ? sw_text_min : sw_text);
+  }
+
+  if (!c->sw.buffer)
+    c->sw.buffer = wlr_scene_buffer_create(c->switcher_tree, NULL);
+  wlr_scene_buffer_set_buffer(c->sw.buffer, &tb->base);
+  wlr_buffer_drop(&tb->base);
+  wlr_scene_node_set_position(&c->sw.buffer->node,
+                              screen.x + (screen.width - w) / 2,
+                              screen.y + (screen.height - h) / 2);
+  wlr_scene_node_set_enabled(&c->sw.buffer->node, true);
+}
+
+static bool switcher_candidate(struct view* v)
+{
+  if (!v->mapped || v->nested || view_is_child(v))
+    return false;
+#ifdef HAVE_XWAYLAND
+  if (v->owner.type == OWNER_XWAYLAND &&
+      (v->xsurface->override_redirect || v->xsurface->skip_taskbar))
+    return false;
+#endif
+  return true;
+}
+
+static bool switcher_begin(struct wvnc_compositor* c)
+{
+  struct view* v;
+  struct view* f = focused_view(c);
+
+  /* a nested compositor has its own window switching */
+  if (f && f->nested)
+    return false;
+  c->sw.n = 0;
+  wl_list_for_each(v, &c->views, link) {
+    if (c->sw.n < SWITCHER_MAX && switcher_candidate(v))
+      c->sw.views[c->sw.n++] = v;
+  }
+  if (c->sw.n == 0)
+    return false;
+  /* X11 icons can change at any time; read them afresh */
+  for (int i = 0; i < c->sw.n; i++)
+    if (c->sw.views[i]->owner.type == OWNER_XWAYLAND)
+      view_icon_changed(c->sw.views[i]);
+  c->sw.active = true;
+  c->sw.sel = 0;
+  c->sw.prev = f;
+  /* The keyboard is ours while the popup is open; the focused window
+   * stays drawn as active */
+  focus_surface(c, NULL);
+  return true;
+}
+
+static void switcher_close(struct wvnc_compositor* c)
+{
+  c->sw.active = false;
+  c->sw.n = 0;
+  if (c->sw.buffer) {
+    wlr_scene_node_destroy(&c->sw.buffer->node);
+    c->sw.buffer = NULL;
+  }
+}
+
+static void switcher_step(struct wvnc_compositor* c, int dir)
+{
+  if (!c->sw.active || c->sw.n == 0)
+    return;
+  c->sw.sel = (c->sw.sel + dir + c->sw.n) % c->sw.n;
+  switcher_render(c);
+}
+
+static void switcher_finish(struct wvnc_compositor* c, bool commit)
+{
+  struct view* sel = NULL;
+  struct view* prev = c->sw.prev;
+  if (!c->sw.active)
+    return;
+  if (commit && c->sw.sel < c->sw.n)
+    sel = c->sw.views[c->sw.sel];
+  switcher_close(c);
+
+  if (!sel)
+    sel = prev;
+  if (prev && prev != sel)
+    view_set_activated(prev, false);
+  if (sel && sel->minimized)
+    view_set_minimized(sel, false);   /* also focuses it */
+  else if (sel)
+    focus_view(sel);
+  else
+    focus_next_view(c);
+}
+
+/* A window went away or was unmapped while the popup is open */
+static void switcher_view_gone(struct view* v)
+{
+  struct wvnc_compositor* c = v->c;
+  int k = -1;
+  if (c->sw.prev == v)
+    c->sw.prev = NULL;
+  if (!c->sw.active)
+    return;
+  for (int i = 0; i < c->sw.n; i++)
+    if (c->sw.views[i] == v)
+      k = i;
+  if (k < 0)
+    return;
+  memmove(&c->sw.views[k], &c->sw.views[k + 1],
+          (size_t)(c->sw.n - k - 1) * sizeof(c->sw.views[0]));
+  c->sw.n--;
+  if (c->sw.sel > k)
+    c->sw.sel--;
+  if (c->sw.n == 0) {
+    switcher_close(c);
+    focus_next_view(c);
+    return;
+  }
+  if (c->sw.sel >= c->sw.n)
+    c->sw.sel = c->sw.n - 1;
+  switcher_render(c);
+}
+
+/* Bookkeeping when a window unmaps or goes away */
+static void view_forget(struct view* v)
+{
+  struct wvnc_compositor* c = v->c;
+  if (c->hover_view == v)
+    c->hover_view = NULL;
+  switcher_view_gone(v);
 }
 
 /* Nested compositors ------------------------------------------------ */
@@ -1406,6 +2089,7 @@ static void xdg_map(struct wl_listener* listener, void* data)
   struct view* v = wl_container_of(listener, v, map);
   (void)data;
   v->mapped = true;
+  v->minimized = false;
   if (!v->nested && !v->nested_checked) {
     /* The socket may not have existed at the initial commit */
     v->nested_checked = true;
@@ -1428,6 +2112,11 @@ static void xdg_unmap(struct wl_listener* listener, void* data)
   bool had_focus = focused_view(c) == v;
   (void)data;
   v->mapped = false;
+  if (v->minimized) {
+    v->minimized = false;
+    wlr_scene_node_set_enabled(&v->scene_tree->node, true);
+  }
+  view_forget(v);
   if (c->grab_view == v) {
     c->grab_mode = GRAB_NONE;
     c->grab_view = NULL;
@@ -1487,7 +2176,8 @@ static void xdg_commit(struct wl_listener* listener, void* data)
 
   wlr_xdg_toplevel_set_wm_capabilities(v->xdg,
     WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE |
-    WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN);
+    WLR_XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN |
+    WLR_XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE);
   wlr_xdg_toplevel_set_bounds(v->xdg, c->usable_area.width,
                               c->usable_area.height);
   xdg_initial_state(v);
@@ -1500,6 +2190,12 @@ static void xdg_destroy(struct wl_listener* listener, void* data)
   bool nested = v->nested;
   (void)data;
   nested_view_gone(v);
+  view_forget(v);
+  wvnc_icon_unref(v->icon);
+  if (v->xdg_icon)
+    wlr_xdg_toplevel_icon_v1_unref(v->xdg_icon);
+  wl_list_remove(&v->request_minimize.link);
+  wl_list_remove(&v->set_app_id.link);
   wl_list_remove(&v->map.link);
   wl_list_remove(&v->unmap.link);
   wl_list_remove(&v->commit.link);
@@ -1563,6 +2259,21 @@ static void xdg_request_maximize(struct wl_listener* listener, void* data)
   wlr_xdg_surface_schedule_configure(v->xdg->base);
 }
 
+static void xdg_request_minimize(struct wl_listener* listener, void* data)
+{
+  struct view* v = wl_container_of(listener, v, request_minimize);
+  (void)data;
+  if (v->xdg->base->initialized && v->mapped && !v->nested)
+    view_set_minimized(v, true);
+}
+
+static void xdg_set_app_id(struct wl_listener* listener, void* data)
+{
+  struct view* v = wl_container_of(listener, v, set_app_id);
+  (void)data;
+  view_icon_changed(v);
+}
+
 static void xdg_request_fullscreen(struct wl_listener* listener, void* data)
 {
   struct view* v = wl_container_of(listener, v, request_fullscreen);
@@ -1609,6 +2320,29 @@ static void handle_new_xdg_toplevel(struct wl_listener* listener, void* data)
   wl_signal_add(&xdg->events.request_maximize, &v->request_maximize);
   v->request_fullscreen.notify = xdg_request_fullscreen;
   wl_signal_add(&xdg->events.request_fullscreen, &v->request_fullscreen);
+  v->request_minimize.notify = xdg_request_minimize;
+  wl_signal_add(&xdg->events.request_minimize, &v->request_minimize);
+  v->set_app_id.notify = xdg_set_app_id;
+  wl_signal_add(&xdg->events.set_app_id, &v->set_app_id);
+}
+
+/* xdg-toplevel-icon-v1: a client set (or unset) its window's icon */
+static void handle_set_icon(struct wl_listener* listener, void* data)
+{
+  struct wvnc_compositor* c = wl_container_of(listener, c, set_icon);
+  struct wlr_xdg_toplevel_icon_manager_v1_set_icon_event* ev = data;
+  struct view* v;
+  wl_list_for_each(v, &c->views, link) {
+    if (v->owner.type != OWNER_XDG || v->xdg != ev->toplevel)
+      continue;
+    if (v->xdg_icon)
+      wlr_xdg_toplevel_icon_v1_unref(v->xdg_icon);
+    v->xdg_icon = ev->icon ? wlr_xdg_toplevel_icon_v1_ref(ev->icon) : NULL;
+    view_icon_changed(v);
+    if (c->sw.active)
+      switcher_render(c);
+    return;
+  }
 }
 
 static void popup_commit(struct wl_listener* listener, void* data)
@@ -1809,6 +2543,7 @@ static void xw_map(struct wl_listener* listener, void* data)
   wlr_scene_subsurface_tree_create(v->scene_tree, xs->surface);
   wlr_scene_node_set_position(&v->scene_tree->node, xs->x, xs->y);
   v->mapped = true;
+  v->minimized = false;
 
   if (xs->override_redirect) {
     if (wlr_xwayland_surface_override_redirect_wants_focus(xs))
@@ -1830,6 +2565,13 @@ static void xw_map(struct wl_listener* listener, void* data)
       WLR_ICCCM_INPUT_MODEL_NONE)
     focus_view(v);
   deco_update(v);
+
+  /* Mapped iconic (WM_HINTS initial_state) */
+  if (xs->hints && (xs->hints->flags & XCB_ICCCM_WM_HINT_STATE) &&
+      xs->hints->initial_state == XCB_ICCCM_WM_STATE_ICONIC)
+    view_set_minimized(v, true);
+  else
+    wlr_xwayland_surface_set_minimized(xs, false);
 }
 
 /* Called on the client's MapRequest, before the X server maps the
@@ -1863,6 +2605,8 @@ static void xw_unmap(struct wl_listener* listener, void* data)
   (void)data;
 
   v->mapped = false;
+  v->minimized = false;
+  view_forget(v);
   if (c->grab_view == v) {
     c->grab_mode = GRAB_NONE;
     c->grab_view = NULL;
@@ -1928,8 +2672,31 @@ static void xw_request_activate(struct wl_listener* listener, void* data)
 {
   struct view* v = wl_container_of(listener, v, request_activate);
   (void)data;
-  if (v->mapped && !v->xsurface->override_redirect)
+  if (!v->mapped || v->xsurface->override_redirect)
+    return;
+  if (v->minimized)
+    view_set_minimized(v, false);   /* also focuses it */
+  else
     focus_view(v);
+}
+
+/* Iconify (WM_CHANGE_STATE, _NET_WM_STATE_HIDDEN) and back */
+static void xw_request_minimize(struct wl_listener* listener, void* data)
+{
+  struct view* v = wl_container_of(listener, v, request_minimize);
+  struct wlr_xwayland_minimize_event* ev = data;
+  if (!v->mapped || v->xsurface->override_redirect) {
+    wlr_xwayland_surface_set_minimized(v->xsurface, false);
+    return;
+  }
+  view_set_minimized(v, ev->minimize);
+}
+
+static void xw_set_class(struct wl_listener* listener, void* data)
+{
+  struct view* v = wl_container_of(listener, v, set_app_id);
+  (void)data;
+  view_icon_changed(v);
 }
 
 static void xw_set_geometry(struct wl_listener* listener, void* data)
@@ -1987,8 +2754,12 @@ static void xw_destroy(struct wl_listener* listener, void* data)
     c->grab_mode = GRAB_NONE;
     c->grab_view = NULL;
   }
+  view_forget(v);
+  wvnc_icon_unref(v->icon);
   if (v->scene_tree)
     wlr_scene_node_destroy(&v->scene_tree->node);
+  wl_list_remove(&v->request_minimize.link);
+  wl_list_remove(&v->set_app_id.link);
   wl_list_remove(&v->associate.link);
   wl_list_remove(&v->dissociate.link);
   wl_list_remove(&v->request_configure.link);
@@ -2056,6 +2827,10 @@ static void handle_xwayland_new_surface(struct wl_listener* listener,
   wl_signal_add(&xs->events.set_title, &v->set_title);
   v->map_request.notify = xw_map_request;
   wl_signal_add(&xs->events.map_request, &v->map_request);
+  v->request_minimize.notify = xw_request_minimize;
+  wl_signal_add(&xs->events.request_minimize, &v->request_minimize);
+  v->set_app_id.notify = xw_set_class;
+  wl_signal_add(&xs->events.set_class, &v->set_app_id);
 }
 
 static void handle_xwayland_ready(struct wl_listener* listener, void* data)
@@ -2352,7 +3127,7 @@ static void process_grab_motion(struct wvnc_compositor* c)
     /* Room for the title bar buttons, and the window's own minimum */
     xcb_size_hints_t* hints = v->xsurface->size_hints;
     if (view_has_deco(v))
-      minw = 3 * DECO_HEIGHT;
+      minw = DECO_MIN_W;
     if (hints && (hints->flags & XCB_ICCCM_SIZE_HINT_P_MIN_SIZE)) {
       if (hints->min_width > minw) minw = hints->min_width;
       if (hints->min_height > minh) minh = hints->min_height;
@@ -2402,6 +3177,7 @@ static void pointer_motion(struct wvnc_compositor* c, uint32_t time)
 
   surface = surface_at(c, c->px, c->py, &sx, &sy, &owner);
   if (surface) {
+    set_deco_hover(c, NULL, -1);
     if (c->seat->pointer_state.focused_surface != surface)
       c->cursor_is_default = false;
     wlr_seat_pointer_notify_enter(c->seat, surface, sx, sy);
@@ -2410,16 +3186,25 @@ static void pointer_motion(struct wvnc_compositor* c, uint32_t time)
     clear_cursor_surface(c);
     wlr_seat_pointer_clear_focus(c->seat);
     const char* name = "default";
+    struct view* hover = NULL;
+    int hover_kind = -1;
 #ifdef HAVE_XWAYLAND
     struct wlr_scene_node* node =
       wlr_scene_node_at(&c->scene->tree.node, c->px, c->py, &sx, &sy);
-    if (node && node->type == WLR_SCENE_NODE_RECT && node->data &&
+    if (node && (node->type == WLR_SCENE_NODE_RECT ||
+                 node->type == WLR_SCENE_NODE_BUFFER) && node->data &&
         ((struct owner*)node->data)->type == OWNER_DECO) {
       struct deco_part* part = node->data;
-      if (part->kind == DECO_EDGE)
+      if (part->kind == DECO_EDGE && node->type == WLR_SCENE_NODE_RECT)
         name = edge_cursor(deco_edges_at(part->view, c->px, c->py));
+      else if (part->kind == DECO_MINIMIZE || part->kind == DECO_MAXIMIZE ||
+               part->kind == DECO_CLOSE) {
+        hover = part->view;
+        hover_kind = part->kind;
+      }
     }
 #endif
+    set_deco_hover(c, hover, hover_kind);
     set_named_cursor(c, name);
   }
 }
@@ -2469,6 +3254,9 @@ static void deco_press(struct wvnc_compositor* c, struct deco_part* part,
     c->button_mask = mask;   /* begin_grab wants a held button */
     begin_grab(v, GRAB_MOVE, 0);
     break;
+  case DECO_MINIMIZE:
+    view_set_minimized(v, true);
+    break;
   case DECO_MAXIMIZE:
     view_maximize(v, !v->maximized, false);
     break;
@@ -2501,6 +3289,10 @@ void wvnc_pointer_event(struct wvnc_compositor* c, int x, int y,
     pointer_motion(c, time);
     frame = true;
   }
+
+  /* A click closes the window switcher, nothing selected */
+  if ((changed & mask & 0x7) && c->sw.active)
+    switcher_finish(c, false);
 
   /* First button press: focus/raise and start an implicit grab */
   if ((changed & mask & 0x7) && c->grab_mode == GRAB_NONE &&
@@ -2787,8 +3579,86 @@ static bool shift_change_needed(struct wvnc_compositor* c,
   return ((mods ^ active) & (1u << shift)) != 0;
 }
 
+static bool mod_held(struct wvnc_compositor* c, const char* name)
+{
+  return c->keyboard.xkb_state &&
+    xkb_state_mod_name_is_active(c->keyboard.xkb_state, name,
+                                 XKB_STATE_MODS_DEPRESSED) > 0;
+}
+
+/* An exclusive keyboard layer surface (e.g. a lock screen) has focus */
+static bool exclusive_layer_focused(struct wvnc_compositor* c)
+{
+  struct wlr_surface* f = c->seat->keyboard_state.focused_surface;
+  struct layer* l;
+  if (!f)
+    return false;
+  wl_list_for_each(l, &c->layers, link) {
+    if (l->layer_surface->surface == f &&
+        l->layer_surface->current.keyboard_interactive ==
+          ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE)
+      return true;
+  }
+  return false;
+}
+
+static void process_key(struct wvnc_compositor* c, uint32_t keysym,
+                        uint32_t qnum, bool down, bool raw,
+                        bool avoid_numlock);
+
 void wvnc_key_event(struct wvnc_compositor* c, uint32_t keysym,
                     uint32_t qnum, bool down, bool raw, bool avoid_numlock)
+{
+  uint32_t sym = keysym;
+
+  if (sym == 0 && qnum) {
+    xkb_keycode_t kc = qnum_to_keycode(qnum);
+    if (kc != XKB_KEYCODE_INVALID && c->keyboard.xkb_state)
+      sym = xkb_state_key_get_one_sym(c->keyboard.xkb_state, kc);
+  }
+
+  /*
+   * Window switcher. Keys still go through process_key() so that the
+   * keyboard state stays right, but while the switcher is open no
+   * client has keyboard focus, so nobody receives them.
+   */
+  if (down && (sym == XKB_KEY_Tab || sym == XKB_KEY_ISO_Left_Tab) &&
+      (c->sw.active || (mod_held(c, XKB_MOD_NAME_ALT) &&
+                        !exclusive_layer_focused(c)))) {
+    bool back = sym == XKB_KEY_ISO_Left_Tab ||
+                mod_held(c, XKB_MOD_NAME_SHIFT);
+    if (c->sw.active) {
+      switcher_step(c, back ? -1 : 1);
+    } else if (switcher_begin(c)) {
+      c->sw.sel = back ? c->sw.n - 1 : (c->sw.n > 1 ? 1 : 0);
+      switcher_render(c);
+    }
+  } else if (down && c->sw.active) {
+    switch (sym) {
+    case XKB_KEY_Up: case XKB_KEY_Left: case XKB_KEY_KP_Up:
+      switcher_step(c, -1);
+      break;
+    case XKB_KEY_Down: case XKB_KEY_Right: case XKB_KEY_KP_Down:
+      switcher_step(c, 1);
+      break;
+    }
+  }
+
+  process_key(c, keysym, qnum, down, raw, avoid_numlock);
+
+  if (!c->sw.active)
+    return;
+  if (down && sym == XKB_KEY_Escape)
+    switcher_finish(c, false);
+  else if (down && (sym == XKB_KEY_Return || sym == XKB_KEY_KP_Enter))
+    switcher_finish(c, true);
+  else if (!mod_held(c, XKB_MOD_NAME_ALT))
+    switcher_finish(c, true);   /* Alt released */
+}
+
+static void process_key(struct wvnc_compositor* c, uint32_t keysym,
+                        uint32_t qnum, bool down, bool raw,
+                        bool avoid_numlock)
 {
   uint32_t id = qnum ? (0x80000000u | qnum) : keysym;
   xkb_keycode_t kc = XKB_KEYCODE_INVALID;
@@ -3451,6 +4321,7 @@ struct wvnc_compositor* wvnc_compositor_create(const struct wvnc_options* opts,
   c->unmanaged_tree = wlr_scene_tree_create(&c->scene->tree);
   c->overlay_tree = wlr_scene_tree_create(&c->scene->tree);
   c->layer_trees[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY] = c->overlay_tree;
+  c->switcher_tree = wlr_scene_tree_create(&c->scene->tree);
 
   c->new_output.notify = handle_new_output;
   wl_signal_add(&c->backend->events.new_output, &c->new_output);
@@ -3460,6 +4331,14 @@ struct wvnc_compositor* wvnc_compositor_create(const struct wvnc_options* opts,
   wl_signal_add(&c->xdg_shell->events.new_toplevel, &c->new_xdg_toplevel);
   c->new_xdg_popup.notify = handle_new_xdg_popup;
   wl_signal_add(&c->xdg_shell->events.new_popup, &c->new_xdg_popup);
+
+  c->icon_manager = wlr_xdg_toplevel_icon_manager_v1_create(c->display, 1);
+  if (c->icon_manager) {
+    int sizes[] = { 32, 48, 64 };
+    wlr_xdg_toplevel_icon_manager_v1_set_sizes(c->icon_manager, sizes, 3);
+    c->set_icon.notify = handle_set_icon;
+    wl_signal_add(&c->icon_manager->events.set_icon, &c->set_icon);
+  }
 
   c->layer_shell = wlr_layer_shell_v1_create(c->display, 4);
   c->new_layer_surface.notify = handle_new_layer_surface;
@@ -3531,6 +4410,12 @@ struct wvnc_compositor* wvnc_compositor_create(const struct wvnc_options* opts,
 
   set_default_cursor(c);
 
+  wvnc_text_init(SW_TEXT_PX);
+  wvnc_log_info("Window switcher (Alt+Tab): icon formats %s, %s",
+                wvnc_icon_formats(),
+                wvnc_text_font_path() ? wvnc_text_font_path() :
+                "built-in bitmap font (no TrueType font found)");
+
   return c;
 
 fail:
@@ -3584,6 +4469,12 @@ void wvnc_compositor_destroy(struct wvnc_compositor* c)
     remove_listener(&c->set_selection);
     remove_listener(&c->set_primary_selection);
     remove_listener(&c->implicit_grab_destroy);
+    remove_listener(&c->set_icon);
+#ifdef HAVE_XWAYLAND
+    if (c->icon_xcb)
+      xcb_disconnect(c->icon_xcb);
+    c->icon_xcb = NULL;
+#endif
     remove_listener(&c->cursor_surface_destroy);
     remove_listener(&c->cursor_surface_commit);
     if (c->keyboard_modifiers.link.next != NULL) {
