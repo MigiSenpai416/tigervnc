@@ -109,7 +109,42 @@ Without `--wayland` or `mode=wayland`, nothing changes.
     maximized or fullscreen gets the screen with the pointer. Without a
     layout, or after a resize without one, there is one screen.
   * Click to focus and raise.
-  * Move and resize through client-side decorations (xdg
+  * Minimize: the minimize button of X11 title bars, X11 iconify
+    requests (`WM_CHANGE_STATE` IconicState, also `WM_HINTS` initial
+    state Iconic) and xdg `set_minimized` (advertised in the xdg
+    `wm_capabilities`, so client-side decorations such as foot's show a
+    minimize button) hide the window. Its X11 `WM_STATE` follows
+    (`wlr_xwayland_surface_set_minimized`). Focus moves to the next
+    window. A minimized window comes back through the window switcher,
+    or when an X11 client asks to be activated.
+  * Window switcher (Alt+Tab), like Openbox's or Windows'. Holding Alt,
+    Tab opens a dark rounded popup centred on the screen with the pointer:
+    one row per window (icon and title), most recently used first,
+    minimized windows (dimmed) last. Tab moves the selection down,
+    Shift+Tab (and the arrow keys) up, wrapping. Releasing Alt (or
+    Return) raises, focuses and un-minimizes the selection; Esc or a
+    click cancels. While the popup is open no client has keyboard focus,
+    so the keys go nowhere. Child (transient) windows, skip-taskbar and
+    override-redirect X11 windows are not listed. When a nested
+    compositor has focus, Alt+Tab is passed to it.
+    * *Icons*, in this order: the client's `xdg-toplevel-icon-v1` icon
+      (pixel buffers, else its theme name); for X11 windows
+      `_NET_WM_ICON` (read over a separate xcb connection, with a 250 ms
+      limit, each time the popup opens); the icon theme: the app id or
+      `WM_CLASS` gives a `.desktop` file (by name or `StartupWMClass`) in
+      `$XDG_DATA_HOME` and `$XDG_DATA_DIRS`, its `Icon=` (else the id
+      itself) is looked up in `hicolor` and `Adwaita` (`~/.icons` and
+      `<datadir>/icons`): PNG sizes first, then `scalable` SVG, then
+      `pixmaps`; finally a built-in generic window icon. PNG needs libpng
+      (`ENABLE_WAYLAND_PNG`), SVG lunasvg (`ENABLE_WAYLAND_SVG`). An SVG
+      that renders to nothing (e.g. one made of text only, as lunasvg
+      loads no system fonts) counts as missing. Lookups are cached.
+    * *Titles* are anti-aliased with FreeType (`ENABLE_WAYLAND_FREETYPE`)
+      in DejaVu Sans, cut with an ellipsis. The font is
+      `WVNC_FONT_FILE` (default `<datadir>/tigervnc/fonts/DejaVuSans.ttf`,
+      where a package can install its own copy), else the usual distro
+      locations of `DejaVuSans.ttf`; no fontconfig. Without FreeType or a
+      font the 6x13 bitmap font is used.  * Move and resize through client-side decorations (xdg
     `move`/`resize` requests and `_NET_WM_MOVERESIZE`).
   * X11 title bars (`X11TitleBars`, default on): managed X11 windows
     get a 22 pixel server-side bar.
@@ -119,8 +154,12 @@ Without `--wayland` or `mode=wayland`, nothing changes.
       characters show as `?`), so there is no font library dependency.
       The text follows renames and is cut with `...` before the buttons.
     * *Buttons and dragging.* Dragging the bar (also on the text) moves
-      the window. It has maximize/restore and close (`WM_DELETE_WINDOW`)
-      buttons. It is blue when focused and grey otherwise.
+      the window. It is blue when focused and grey otherwise. At its
+      right are Windows 11 style buttons: minimize, maximize/restore and
+      close (`WM_DELETE_WINDOW`). They are flat 32 pixel cells in the bar
+      colour with thin 1 pixel light glyphs, drawn in code (no drawing
+      library). Hovering lightens the cell; the close cell turns #c42b1c
+      with a white cross. They act on press.
     * *Resize borders.* An invisible 5 pixel border around the frame
       (title bar plus window) resizes with the pointer, by one edge or,
       within 16 pixels of a corner, by two. The pointer shows the
@@ -306,9 +345,11 @@ Without `--wayland` or `mode=wayland`, nothing changes.
 | `unix/xvnc-wayland/nested_bridge.{h,c}` | nested compositor detection helper and clipboard bridge |
 | `unix/xvnc-wayland/ControlSocket.{h,cxx}` | vncconfig control socket |
 | `unix/vncconfig/vncconfig.{cxx,man}` | control socket in Wayland mode: command-line options, the window and the QueryConnect prompt |
+| `unix/xvnc-wayland/wm_icons.{h,c}`, `icon_svg.cxx` | window switcher icons: `_NET_WM_ICON` scaling, icon theme / `.desktop` lookup, PNG (libpng) and SVG (lunasvg) loading, fallback icon |
+| `unix/xvnc-wayland/wm_text.{h,c}` | window switcher text: FreeType (DejaVu Sans), ellipsis, 6x13 fallback |
 | `unix/xvnc-wayland/deco_font.h` | 6x13 bitmap font for X11 title text (generated from X.Org misc-fixed, public domain) |
 | `contrib/wayland-mode/tools/gen-deco-font.py` | generator for `deco_font.h` |
-| `CMakeLists.txt`, `unix/CMakeLists.txt` | `ENABLE_WAYLAND_SERVER` (AUTO/ON/OFF), `WLROOTS_PKG` |
+| `CMakeLists.txt`, `unix/CMakeLists.txt` | `ENABLE_WAYLAND_SERVER` (AUTO/ON/OFF), `WLROOTS_PKG`; `ENABLE_WAYLAND_PNG`, `ENABLE_WAYLAND_SVG`, `ENABLE_WAYLAND_FREETYPE` (AUTO/ON/OFF) and `WVNC_FONT_FILE` for the window switcher |
 | `config.h.in` | `CMAKE_INSTALL_FULL_SYSCONFDIR` for vncsession |
 | `unix/vncserver/vncserver.in` | `mode=` handling, Wayland session start |
 | `unix/vncserver/vncsession.c` | read `mode` before PAM, set `XDG_SESSION_TYPE` |
@@ -329,6 +370,8 @@ Reference platform: Ubuntu 26.04 (resolute), as pinned in
 | Xwayland | 2:24.1.10-1 |
 | wayland-protocols | 1.47 |
 | libwayland (server and client), xkbcommon, pixman, libdrm, xcb | distro versions |
+| libpng (`libpng-dev`), FreeType (`libfreetype-dev`), DejaVu fonts (`fonts-dejavu-core`) | distro versions (window switcher) |
+| lunasvg (with its bundled plutovg 1.3.1) | 3.5.0, built static in `Dockerfile.buildenv` from the release tarball (sha256 `1abf1472ee6c4d19797916e8cc3c2e4b628e0d81178ffac60bdb0d457e32c690`); not packaged by Ubuntu |
 | sway, labwc (test image only) | Ubuntu 26.04 versions, used by the nested tests |
 
 wlroots breaks its API between minor releases. The code targets 0.19
@@ -418,11 +461,16 @@ Run with `contrib/wayland-mode/run-tests.sh`. Results are in
 * `test_wayland.py`: the Wayland mode criteria, plus Xauthority,
   display persistence and `-ExitWithSession`, `-depth 16`, ignored X
   options, `AvoidShiftNumLock` (checked with `xev`), two-screen window
-  placement, `wlr-randr`, X11 title bars and `vncconfig`.
+  placement, `wlr-randr`, X11 title bars (buttons, hover colours,
+  minimize), the Alt+Tab window switcher (order, selection, Esc,
+  minimized windows, X11 and xdg minimize requests, icons from
+  `_NET_WM_ICON`, a PNG and an SVG theme icon and the fallback) and
+  `vncconfig`.
 * `test_nested.py`: a real nested sway, and labwc: detection,
   fullscreen over VNC, keyboard and pointer into foot inside sway, both
   selections both ways, resize, a two-screen layout mapped to two sway
-  outputs, labwc clipboard and resize, and `NestedCompositor=Off`
+  outputs, Alt+Tab reaching sway, labwc clipboard and resize, and
+  `NestedCompositor=Off`
   falling back to the floating WM.
 * `test_vncsession.py`: the vncsession → PAM → vncserver → Xvnc path,
   as root, including the stock `sway.desktop` session (Super+Return
@@ -511,8 +559,11 @@ Run with `contrib/wayland-mode/run-tests.sh`. Results are in
   countdown labels. This also happens with X11 Xvnc in the test image,
   with the unmodified upstream TX code, so it is not specific to Wayland
   mode.
-* X11 title bars have no minimize button (there is no taskbar to
-  restore from). The title font covers Latin-1 only.
+* The X11 title bar font covers Latin-1 only (the window switcher's
+  FreeType text does not have that limit).
+* There is no taskbar: minimized windows come back through Alt+Tab.
+  The switcher looks icons up in `hicolor` and `Adwaita` only, not in
+  the desktop's configured icon theme; XPM icons are not read.
 * Clients that don't support the cursor pseudo-encoding see the
   server-rendered cursor at the top-left corner. `Xvnc-wayland` does
   not report pointer motion to the RFB core's cursor position
