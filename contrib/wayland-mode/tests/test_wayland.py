@@ -944,6 +944,43 @@ def misc_fixed_glyphs():
     return glyphs
 
 
+# 14x14 X11 title-bar buttons (DECO_BUTTON = DECO_HEIGHT-8). Backgrounds
+# match compositor.c (button_max 0.85, button_close 0.80/0.25/0.25);
+# glyphs are white (close) and #202020 (maximize / restore).
+BTN = 14
+MAX_BG = (217, 217, 217)
+CLOSE_BG = (204, 64, 64)
+GLYPH_DARK = (32, 32, 32)
+GLYPH_WHITE = (255, 255, 255)
+
+
+def button_origin(g, which, T=22):
+    """Top-left of the maximize ('max') or close button for geometry g."""
+    x, y, w, _ = g
+    if which == "close":
+        return x + w - T + 4, y - T + 4
+    return x + w - 2 * T + 4, y - T + 4
+
+
+def button_colour_ok(c, bx, by, bg, glyph, min_glyph=20):
+    """Corners are the button colour (away from the glyph); enough pixels
+    match the glyph colour. Returns (ok, note)."""
+    corners = [(0, 0), (0, BTN - 1), (BTN - 1, 0), (BTN - 1, BTN - 1)]
+    for dx, dy in corners:
+        px = c.pixel(bx + dx, by + dy)
+        if not near(px, bg, 3):
+            return False, "corner %d,%d is %r, want ~%r" % (dx, dy, px, bg)
+    n = 0
+    for dy in range(BTN):
+        for dx in range(BTN):
+            px = c.pixel(bx + dx, by + dy)
+            if near(px, glyph, 3):
+                n += 1
+    if n < min_glyph:
+        return False, "only %d glyph pixels, want >= %d" % (n, min_glyph)
+    return True, "bg ~%r, %d glyph pixels" % (bg, n)
+
+
 def title_text_matches(c, g, T, text, glyphs):
     """Compares the title bar's white text pixels with `text` rendered in
     6x13 at (6, (T-13)//2) in the bar; returns (match, mismatches)."""
@@ -995,6 +1032,17 @@ def t_x11_title_bars():
         bar = c.pixel(g[0] + g[2] - 2 * T - 4, g[1] - T // 2) if g else None
         check(g is not None and near(bar, BAR, 3),
               "xterm at %r, title bar pixel %r" % (g, bar))
+
+        # button colours at the corners (away from the glyph) and glyph pixels
+        if g is not None:
+            c.pointer(0, 0)
+            c.refresh()
+            mx, my = button_origin(g, "max", T)
+            cx, cy = button_origin(g, "close", T)
+            ok_m, n_m = button_colour_ok(c, mx, my, MAX_BG, GLYPH_DARK)
+            ok_c, n_c = button_colour_ok(c, cx, cy, CLOSE_BG, GLYPH_WHITE)
+            check(ok_m, "maximize button: " + n_m)
+            check(ok_c, "close button: " + n_c)
 
         # title text: the window's title, pixel exact in misc-fixed 6x13
         m, bad = title_text_matches(c, g, T, "Title Test 42", glyphs)
@@ -1067,6 +1115,12 @@ def t_x11_title_bars():
         notes.append("maximize button -> %r (want 0,%d ~800x%d)" %
                      (g3, T, 600 - T))
         ok = ok and maxed
+        if g3 is not None:
+            c.pointer(0, 0)
+            c.refresh()
+            mx, my = button_origin(g3, "max", T)
+            ok_r, n_r = button_colour_ok(c, mx, my, MAX_BG, GLYPH_DARK)
+            check(ok_r, "restore glyph on maximized button: " + n_r)
 
         # again: restore
         c.click(g3[0] + g3[2] - 2 * T + T // 2, g3[1] - T // 2)
@@ -1098,7 +1152,8 @@ def t_x11_title_bars():
 
 s.run("X11 title bars: window title drawn as text (pixel exact, follows "
       "renames), resize by edges and corners, drag moves, maximize/restore "
-      "and close buttons work", t_x11_title_bars)
+      "and close buttons work, button colours and glyphs present",
+      t_x11_title_bars)
 def t_vncconfig():
     import subprocess, stat
     envf, sess = small_session(12)

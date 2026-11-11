@@ -316,6 +316,8 @@ struct view {
   struct wlr_scene_buffer* deco_title;
   char* deco_title_text;                    /* what deco_title shows */
   int deco_title_width;
+  struct wlr_scene_buffer* deco_icons[2];   /* maximize, close; on the buttons */
+  int deco_max_glyph;                       /* last max/restore glyph, or -1 */
   struct deco_part {
     struct owner owner;
     struct view* view;
@@ -809,6 +811,7 @@ static void view_place(struct view* v)
 #define DECO_HEIGHT 22
 #define DECO_BORDER 5     /* invisible resize border around the frame */
 #define DECO_CORNER 16    /* corner zone along each edge */
+#define DECO_BUTTON (DECO_HEIGHT - 8)  /* 14x14 close / maximize buttons */
 enum { DECO_BAR, DECO_MAXIMIZE, DECO_CLOSE, DECO_EDGE };
 
 #include "deco_font.h"
@@ -952,6 +955,67 @@ static void deco_set_title(struct view* v, int w)
   if (buf)
     wlr_buffer_drop(buf);   /* the scene buffer keeps a lock */
 }
+
+#define DECO_GLYPH_MAX 0
+#define DECO_GLYPH_RESTORE 1
+#define DECO_GLYPH_CLOSE 2
+
+/* 14x14 1-bit icons; 0x2000 is the leftmost pixel of each row. Close is a
+ * 2px-stroke X; maximize is a square with a thicker top edge; restore is
+ * two overlapping squares. Painted onto the existing coloured button rects. */
+static const uint16_t deco_glyphs[][DECO_BUTTON] = {
+  [DECO_GLYPH_MAX] = {
+    0x0000, 0x0000,
+    0x0FFC, 0x0FFC, 0x0804, 0x0804, 0x0804,
+    0x0804, 0x0804, 0x0804, 0x0804, 0x0FFC,
+    0x0000, 0x0000,
+  },
+  [DECO_GLYPH_RESTORE] = {
+    0x0000, 0x0000,
+    0x01FC, 0x01FC, 0x0104, 0x0FE4, 0x0FE4,
+    0x0824, 0x083C, 0x0820, 0x0820, 0x0FE0,
+    0x0000, 0x0000,
+  },
+  [DECO_GLYPH_CLOSE] = {
+    0x0000, 0x0000,
+    0x0C0C, 0x0E1C, 0x0738, 0x03F0, 0x01E0,
+    0x01E0, 0x03F0, 0x0738, 0x0E1C, 0x0C0C,
+    0x0000, 0x0000,
+  },
+};
+
+static struct wlr_buffer* render_glyph(int which, uint32_t colour)
+{
+  struct text_buffer* tb = calloc(1, sizeof(*tb));
+  int w = DECO_BUTTON, h = DECO_BUTTON;
+  if (!tb)
+    return NULL;
+  tb->stride = (size_t)w * 4;
+  tb->data = calloc((size_t)w * h, 4);
+  if (!tb->data) {
+    free(tb);
+    return NULL;
+  }
+  for (int y = 0; y < h; y++) {
+    uint16_t bits = deco_glyphs[which][y];
+    for (int x = 0; x < w; x++)
+      if (bits & (0x2000 >> x))
+        tb->data[(size_t)y * w + x] = colour;
+  }
+  wlr_buffer_init(&tb->base, &text_buffer_impl, w, h);
+  return &tb->base;
+}
+
+static void deco_set_icon(struct wlr_scene_buffer* node, int glyph,
+                          uint32_t colour)
+{
+  struct wlr_buffer* buf = render_glyph(glyph, colour);
+  wlr_scene_buffer_set_buffer(node, buf);
+  wlr_scene_node_set_enabled(&node->node, buf != NULL);
+  if (buf)
+    wlr_buffer_drop(buf);   /* the scene buffer keeps a lock */
+}
+
 #endif
 
 static void deco_update(struct view* v)
@@ -975,14 +1039,19 @@ static void deco_update(struct view* v)
     v->deco = wlr_scene_tree_create(v->scene_tree);
     v->deco_bar = wlr_scene_rect_create(v->deco, 1, DECO_HEIGHT,
                                         bar_active);
-    v->deco_buttons[0] = wlr_scene_rect_create(v->deco, DECO_HEIGHT - 8,
-                                               DECO_HEIGHT - 8, button_max);
-    v->deco_buttons[1] = wlr_scene_rect_create(v->deco, DECO_HEIGHT - 8,
-                                               DECO_HEIGHT - 8,
+    v->deco_buttons[0] = wlr_scene_rect_create(v->deco, DECO_BUTTON,
+                                               DECO_BUTTON, button_max);
+    v->deco_buttons[1] = wlr_scene_rect_create(v->deco, DECO_BUTTON,
+                                               DECO_BUTTON,
                                                button_close);
     v->deco_title = wlr_scene_buffer_create(v->deco, NULL);
     for (int i = 0; i < 4; i++)
       v->deco_edges[i] = wlr_scene_rect_create(v->deco, 1, 1, invisible);
+    /* Icons sit above the button rects; node.data maps clicks to the button. */
+    v->deco_icons[0] = wlr_scene_buffer_create(v->deco, NULL);
+    v->deco_icons[1] = wlr_scene_buffer_create(v->deco, NULL);
+    deco_set_icon(v->deco_icons[1], DECO_GLYPH_CLOSE, 0xffffffff);
+    v->deco_max_glyph = -1;
     for (int i = 0; i < 4; i++) {
       v->deco_parts[i].owner.type = OWNER_DECO;
       v->deco_parts[i].view = v;
@@ -991,6 +1060,8 @@ static void deco_update(struct view* v)
     v->deco_bar->node.data = &v->deco_parts[DECO_BAR];
     v->deco_buttons[0]->node.data = &v->deco_parts[DECO_MAXIMIZE];
     v->deco_buttons[1]->node.data = &v->deco_parts[DECO_CLOSE];
+    v->deco_icons[0]->node.data = &v->deco_parts[DECO_MAXIMIZE];
+    v->deco_icons[1]->node.data = &v->deco_parts[DECO_CLOSE];
     /* the title text belongs to the bar (drag, double click) */
     v->deco_title->node.data = &v->deco_parts[DECO_BAR];
     for (int i = 0; i < 4; i++)
@@ -1005,13 +1076,19 @@ static void deco_update(struct view* v)
   wlr_scene_rect_set_size(v->deco_bar, w, DECO_HEIGHT);
   wlr_scene_rect_set_color(v->deco_bar,
                            v->activated ? bar_active : bar_inactive);
-  wlr_scene_node_set_position(&v->deco_buttons[1]->node,
-                              w - DECO_HEIGHT + 4, 4);
-  wlr_scene_node_set_position(&v->deco_buttons[0]->node,
-                              w - 2 * DECO_HEIGHT + 4, 4);
+  int close_x = w - DECO_HEIGHT + 4, max_x = w - 2 * DECO_HEIGHT + 4;
+  wlr_scene_node_set_position(&v->deco_buttons[1]->node, close_x, 4);
+  wlr_scene_node_set_position(&v->deco_buttons[0]->node, max_x, 4);
+  wlr_scene_node_set_position(&v->deco_icons[1]->node, close_x, 4);
+  wlr_scene_node_set_position(&v->deco_icons[0]->node, max_x, 4);
   wlr_scene_node_set_position(&v->deco_title->node, 6,
                               (DECO_HEIGHT - DECO_FONT_H) / 2);
   deco_set_title(v, w);
+  int want = v->maximized ? DECO_GLYPH_RESTORE : DECO_GLYPH_MAX;
+  if (v->deco_max_glyph != want) {
+    v->deco_max_glyph = want;
+    deco_set_icon(v->deco_icons[0], want, 0xff202020);
+  }
 
   /* Resize borders, no resizing when maximized (like moving) */
   bool resizable = !v->maximized;
