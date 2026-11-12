@@ -6,6 +6,7 @@ $ARTIFACTS/results-wayland.json, screenshots to $ARTIFACTS/wayland-*.png.
 """
 
 import os
+import shutil
 import socket
 import sys
 import time
@@ -1394,12 +1395,18 @@ def t_switcher():
               "Alt released: A un-minimized, raised, focused (WM_STATE %s)"
               % st)
 
-        # a Wayland client's minimize request (foot's own minimize button)
-        foot = subprocess.Popen(["foot", "-W", "30x6"], env=env)
-        procs.append(foot)
+        # a Wayland client's minimize request (foot's own minimize button);
+        # distros without foot (18.04) only run the X11 part above
+        have_foot = shutil.which("foot") is not None
+        if have_foot:
+            foot = subprocess.Popen(["foot", "-W", "30x6"], env=env)
+            procs.append(foot)
+        else:
+            notes.append("xdg request_minimize part not run: needs foot, "
+                         "not installed on this distro")
         fb = None
         end = time.time() + 10
-        while time.time() < end and not fb:
+        while have_foot and time.time() < end and not fb:
             time.sleep(0.5)
             c.refresh()
             fb = find_colour_bbox(c, FOOT_BG, min_run=50)
@@ -1420,7 +1427,7 @@ def t_switcher():
             check(hidden and back,
                   "foot (xdg request_minimize): hidden=%s, back after "
                   "Alt+Tab x3=%s" % (hidden, back))
-        else:
+        elif have_foot:
             check(False, "foot window not found")
         c.close()
     except Exception as e:

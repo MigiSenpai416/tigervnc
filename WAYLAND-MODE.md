@@ -144,7 +144,8 @@ Without `--wayland` or `mode=wayland`, nothing changes.
       `WVNC_FONT_FILE` (default `<datadir>/tigervnc/fonts/DejaVuSans.ttf`,
       where a package can install its own copy), else the usual distro
       locations of `DejaVuSans.ttf`; no fontconfig. Without FreeType or a
-      font the 6x13 bitmap font is used.  * Move and resize through client-side decorations (xdg
+      font the 6x13 bitmap font is used.
+  * Move and resize through client-side decorations (xdg
     `move`/`resize` requests and `_NET_WM_MOVERESIZE`).
   * X11 title bars (`X11TitleBars`, default on): managed X11 windows
     get a 22 pixel server-side bar.
@@ -412,6 +413,10 @@ Runtime dependencies on the target are only glibc (>= 2.27), libGL
 (Mesa, plus `swrast_dri.so` for GLX), libpam, and libsystemd/libgbm
 when those features are on. `/usr/share/tigervnc/check-runtime.sh`
 checks them.
+The window switcher's libraries (libpng, lunasvg, FreeType) are linked
+into `Xvnc-wayland` only, and its font is a private copy of DejaVu Sans
+in `/usr/share/tigervnc/fonts` (with its license), so no distro font
+package or fontconfig is needed.
 
 `xinit` and `xauth` are optional and are not bundled. As upstream does,
 the distro's packages are used, and only X11 sessions started through
