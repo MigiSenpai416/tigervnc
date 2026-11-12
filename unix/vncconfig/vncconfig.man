@@ -109,6 +109,20 @@ When run as a "helper" app, make the window iconified at startup.
 .B \-nowin
 When run as a "helper" app, don't put up a window.
 
+.SH WAYLAND MODE
+With \fBXvnc \-\-wayland\fP there is no VNC X extension. When the X
+display cannot be used, \fBvncconfig\fP connects to the server's control
+socket instead: \fI$TIGERVNC_VNCCONFIG\fP, which the server sets for the
+session, or \fI$XDG_RUNTIME_DIR/tigervnc\-$WAYLAND_DISPLAY.vncconfig\fP.
+Only the user running the server can use it. \fB\-connect\fP,
+\fB\-disconnect\fP, \fB\-list\fP, \fB\-get\fP, \fB\-desc\fP and
+\fB\-set\fP work as with Xvnc (\fB\-set\fP is limited to
+\fBAllowOverride\fP). Without options \fBvncconfig\fP runs as with Xvnc,
+as an X client of Xwayland: the window sets the clipboard parameters,
+and with \fBQueryConnect\fP set it shows the Accept/Reject dialog for
+each incoming connection (also with \fB\-nowin\fP). While no
+\fBvncconfig\fP is running, such connections are rejected.
+.
 .SH SEE ALSO
 .BR vncpasswd (1),
 .BR vncviewer (1),

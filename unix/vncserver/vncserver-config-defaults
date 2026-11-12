@@ -9,7 +9,10 @@
 # Several common settings are shown below. Uncomment and modify to your
 # liking.
 
+# "mode" is either x11 (the default) or wayland. In Wayland mode, "session"
+# names a file in /usr/share/wayland-sessions instead of /usr/share/xsessions.
 # session=gnome
+# mode=x11
 # securitytypes=vncauth,tlsvnc
 # geometry=2000x1200
 # localhost

@@ -1,0 +1,94 @@
+[
+  {
+    "suite": "nested",
+    "test": "sway session detected as nested compositor, clipboard bridge connected",
+    "status": "PASS",
+    "detail": "server log: ['WaylandDesktop: Client pid 12 (wlroots) is a nested compositor serving', 'WaylandDesktop: Clipboard bridge to nested compositor (pid 12) ready,'] ['WaylandDesktop: Clipboard bridge to nested compositor (pid 12) ready,']",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "nested sway output is fullscreen and undecorated (screenshot over VNC)",
+    "status": "PASS",
+    "detail": "foot background covers 100% of 1024x768, corners [(36, 36, 36), (36, 36, 36), (36, 36, 36), (36, 36, 36)], sway outputs [('WL-1', 0, 0, 1024, 768)]",
+    "artifacts": [
+      "/artifacts/nested-01-sway-foot-fullscreen.png"
+    ]
+  },
+  {
+    "suite": "nested",
+    "test": "keyboard input reaches a client of the nested compositor (foot in sway)",
+    "status": "PASS",
+    "detail": "file content 'nested-key-42-foot-sway'",
+    "artifacts": [
+      "/artifacts/nested-02-typed.png"
+    ]
+  },
+  {
+    "suite": "nested",
+    "test": "pointer reaches nested client (double click selects word), primary nested -> viewer",
+    "status": "PASS",
+    "detail": "primary in sway after double click: 'NESTEDPTR'; viewer received 'NESTEDPTR' (primary bridged to VNC)",
+    "artifacts": [
+      "/artifacts/nested-03-selected.png"
+    ]
+  },
+  {
+    "suite": "nested",
+    "test": "clipboard nested -> viewer (wl-copy in sway -> ServerCutText)",
+    "status": "PASS",
+    "detail": "viewer received 'from-sway-123'",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "clipboard viewer -> nested (ClientCutText -> wl-paste and wl-paste --primary in sway)",
+    "status": "PASS",
+    "detail": "sway clipboard='from-vnc-to-sway-456' primary='from-vnc-to-sway-456'",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "clipboard viewer -> paste into foot inside sway with Ctrl+Shift+V",
+    "status": "PASS",
+    "detail": "file content 'pasted-42'",
+    "artifacts": []
+  },
+  {
+    "suite": "nested",
+    "test": "client resize: nested output follows (1024x768 -> 1280x720)",
+    "status": "PASS",
+    "detail": "viewer fb 1280x720, sway outputs [('WL-1', 0, 0, 1280, 720)], foot covers 100%",
+    "artifacts": [
+      "/artifacts/nested-04-resized-1280x720.png"
+    ]
+  },
+  {
+    "suite": "nested",
+    "test": "multi-monitor: two-screen client layout -> two nested outputs (sway WLR_WL_OUTPUTS=2)",
+    "status": "PASS",
+    "detail": "viewer fb 1600x600; sway outputs [('WL-2', 0, 0, 800, 600), ('WL-1', 800, 0, 800, 600)]; foot is on WL-2; left screen foot 0%/background 100%, right screen foot 100%/background 0%",
+    "artifacts": [
+      "/artifacts/nested-05-two-screens.png"
+    ]
+  },
+  {
+    "suite": "nested",
+    "test": "labwc session: detected, output fills the screen, clipboard both ways, resize follows",
+    "status": "PASS",
+    "detail": "detected=True; labwc output (1024, 768), our background visible on 0.0%; clipboard labwc->viewer 'from-labwc-77', viewer->labwc 'to-labwc-88'; after resize labwc output (1280, 720), our background 0.0%",
+    "artifacts": [
+      "/artifacts/nested-06-labwc.png",
+      "/artifacts/nested-07-labwc-1280x720.png"
+    ]
+  },
+  {
+    "suite": "nested",
+    "test": "NestedCompositor=Off: sway is managed as an ordinary window (floating WM fallback)",
+    "status": "PASS",
+    "detail": "detected=False; sway output [('WL-1', 0, 0, 1280, 720)]; our background visible on 6%",
+    "artifacts": [
+      "/artifacts/nested-08-nestedcompositor-off.png"
+    ]
+  }
+]

@@ -26,6 +26,8 @@ extern "C" {
 
 void vncInitRFB(void);
 
+const char* vncGetWaylandServerPath(void);
+
 void vncLogError(const char *name, const char *format, ...)
         __attribute__((__format__ (__printf__, 2, 3)));
 void vncLogStatus(const char *name, const char *format, ...)

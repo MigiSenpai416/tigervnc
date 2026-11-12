@@ -1,0 +1,1 @@
+Xvnc --wayland :1 -geometry 1024x768 -depth 24 -desktop wayland-test -rfbauth /tmp/wltest/passwd -SecurityTypes VncAuth,X509Vnc,TLSVnc -X509Cert /tmp/wltest/cert.pem -X509Key /tmp/wltest/key.pem -localhost -- /tmp/wltest/session.sh

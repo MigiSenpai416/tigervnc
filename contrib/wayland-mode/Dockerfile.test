@@ -1,0 +1,46 @@
+# Test image: build environment + extra test tools + the staged install
+# produced by build.sh. Build with the build directory as context:
+#   docker build -f contrib/wayland-mode/Dockerfile.test -t tigervnc-wl-test /path/to/build
+ARG BUILDENV_IMAGE=tigervnc-wl-buildenv:26.04
+FROM ${BUILDENV_IMAGE} AS tools
+ARG http_proxy
+ARG https_proxy
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      xclip x11-utils wlr-randr wayland-utils openssl python3-pil \
+      libpam-pwquality sway labwc && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -f /etc/apt/apt.conf.d/80proxy
+
+# Nested-compositor fix: Ubuntu's libwlroots 0.19.2-1 lacks upstream commit
+# 16cb509a ("render/allocator: add missing wlr_buffer_finish() in destroy
+# impls", in wlroots >= 0.19.3). Without it, a nested sway/labwc using the
+# shm allocator (pixman, i.e. always under Xvnc --wayland) never emits
+# wlr_buffer destroy, so its wayland backend keeps wl_buffers cached by
+# stale wlr_buffer pointers and, when malloc hands the address to a new
+# buffer, commits an old (cursor-sized) wl_buffer as an output's frame.
+# Rebuild the distro package's library with that one patch (build.sh copies
+# contrib/wayland-mode/patches/ into the build dir).
+FROM ${BUILDENV_IMAGE} AS wlroots-fix
+ARG http_proxy
+ARG https_proxy
+ARG WLROOTS_VERSION=0.19.2-1
+RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/*.sources && \
+    apt-get update && apt-get build-dep -y "wlroots=${WLROOTS_VERSION}" && \
+    apt-get install -y --no-install-recommends meson ninja-build && \
+    cd /usr/src && apt-get source "wlroots=${WLROOTS_VERSION}" && \
+    rm -rf /var/lib/apt/lists/*
+COPY wlroots-patches/ /patches/
+RUN cd /usr/src/wlroots-0.19.2 && \
+    for p in /patches/wlroots-*.patch; do patch -p1 < "$p"; done && \
+    meson setup build -Dexamples=false -Dwerror=false --buildtype=debugoptimized && \
+    ninja -C build libwlroots-0.19.so
+
+FROM tools
+COPY --from=wlroots-fix /usr/src/wlroots-0.19.2/build/libwlroots-0.19.so \
+     /usr/lib/x86_64-linux-gnu/libwlroots-0.19.so
+COPY stage/ /
+RUN ldconfig && \
+    useradd -m -s /bin/bash vncuser && \
+    echo 'vncuser:vncpass123' | chpasswd && \
+    echo ':1=vncuser' >> /etc/tigervnc/vncserver.users

@@ -1,0 +1,286 @@
+[
+  {
+    "suite": "wayland",
+    "test": "headless start (no GPU, no parent display), session started with WAYLAND_DISPLAY+DISPLAY",
+    "status": "PASS",
+    "detail": "session env WAYLAND_DISPLAY=wayland-1 DISPLAY=:0 XDG_SESSION_TYPE=wayland; /dev/dri present=False",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "auth: VncAuth with correct password",
+    "status": "PASS",
+    "detail": "offered=[19, 2] name='wayland-test' size=1024x768",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "auth: VncAuth with wrong password rejected",
+    "status": "PASS",
+    "detail": "rejected: authentication failed: Authentication failed",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "auth: X509Vnc (VeNCrypt, X.509 TLS + VNC password)",
+    "status": "PASS",
+    "detail": "subtypes=[2, 261, 258] tls=TLSv1.3 cipher=TLS_AES_256_GCM_SHA384 cert=781 bytes",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "auth: TLSVnc (VeNCrypt, anonymous TLS + VNC password)",
+    "status": "PASS",
+    "detail": "tls=TLSv1.2 cipher=AECDH-AES256-SHA",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "auth: security type None not offered when not configured",
+    "status": "PASS",
+    "detail": "security type None not offered (offered [19, 2])",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "-localhost: not reachable on external address",
+    "status": "PASS",
+    "detail": "connect to 172.17.0.2:5901 refused ([Errno 111] Connection refused)",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "Wayland client renders (foot)",
+    "status": "PASS",
+    "detail": "foot content area (296, 320, 726, 526) (430x206)",
+    "artifacts": [
+      "/artifacts/wayland-02-foot.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "X11 clients render via Xwayland (xterm, xeyes)",
+    "status": "PASS",
+    "detail": "xterm white area (560, 430, 862, 562) (want origin 560,430), xdotool windows=['6291468'], xeyes colours=162, appeared after 2.5s",
+    "artifacts": [
+      "/artifacts/wayland-03-foot-xterm-xeyes.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "keyboard input reaches Wayland client (foot)",
+    "status": "PASS",
+    "detail": "file content 'wl-key-ok-42-foot'",
+    "artifacts": [
+      "/artifacts/wayland-04-foot-typed.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "keyboard input reaches X11 client (xterm via Xwayland)",
+    "status": "PASS",
+    "detail": "file content 'x-key-ok-42-XTerm(407)'",
+    "artifacts": [
+      "/artifacts/wayland-05-xterm-typed.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "pointer motion+buttons reach Wayland client (foot word selection by double click)",
+    "status": "PASS",
+    "detail": "primary selection after double click in foot: 'PTRWLTEST'",
+    "artifacts": [
+      "/artifacts/wayland-06-foot-selected.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "pointer motion+buttons reach X11 client (xterm selection, xdotool pointer position)",
+    "status": "PASS",
+    "detail": "X PRIMARY='PTRXTEST', Wayland primary='PTRXTEST', X pointer='x:637 y:463 screen:0 window:6291468' (want x:637 y:463)",
+    "artifacts": [
+      "/artifacts/wayland-07-xterm-selected.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "clipboard Wayland -> viewer (wl-copy -> ServerCutText)",
+    "status": "PASS",
+    "detail": "viewer received 'from-wayland-123'",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "primary selection Wayland -> viewer (wl-copy --primary)",
+    "status": "PASS",
+    "detail": "viewer received 'primary-wayland-321' (SendPrimary default on)",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "clipboard viewer -> Wayland+X11 (ClientCutText -> wl-paste, wl-paste --primary, xclip)",
+    "status": "PASS",
+    "detail": "Wayland clipboard='from-vnc-456' primary='from-vnc-456'; X11 CLIPBOARD='from-vnc-456' PRIMARY='from-vnc-456' (SetPrimary default on)",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "clipboard X11 app -> viewer (xclip via Xwayland -> ServerCutText)",
+    "status": "PASS",
+    "detail": "viewer received 'from-x11-789'",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "clipboard viewer -> paste into foot with Ctrl+Shift+V",
+    "status": "PASS",
+    "detail": "file content 'pasted-42'",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "client resize 1024x768 -> 1280x720 changes the output (viewers, wl_output mode, Xwayland screen)",
+    "status": "PASS",
+    "detail": "viewer fb 1280x720, ExtendedDesktopSize reply status=0, second viewer 1280x720, wl_output mode (1280, 720), Xwayland 'dimensions:    1280x720 pixels (338x190 millimeters)'",
+    "artifacts": [
+      "/artifacts/wayland-08-resized-1280x720.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "client resize to 1000x700",
+    "status": "PASS",
+    "detail": "viewer fb 1000x700, wl_output mode (1000, 700), foot area (296, 320, 726, 526)",
+    "artifacts": [
+      "/artifacts/wayland-09-resized-1000x700.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "input still works after resize",
+    "status": "PASS",
+    "detail": "file content 'after-resize'",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "second Wayland client (weston-terminal) starts",
+    "status": "PASS",
+    "detail": "weston-terminal pid 63, 88650 sampled pixels changed",
+    "artifacts": [
+      "/artifacts/wayland-10-weston-terminal.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "Xwayland uses a private X authority file (XAUTHORITY for the session, clients without the cookie refused)",
+    "status": "PASS",
+    "detail": "session XAUTHORITY=/tmp/wltest/xdg-runtime/tigervnc-wayland-1.Xauthority mode=0o600; xdpyinfo with it rc=0, without it rc=1 (); Xwayland args 'Xwayland :0 -auth /tmp/wltest/xdg-runtime/tigervnc-wayland-1.Xauthority -rootless -core -terminate -listenfd 15 -listenfd 16 -displayfd 25 -wm 22'",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "server survived the whole run and exits on SIGTERM",
+    "status": "PASS",
+    "detail": "server alive until SIGTERM, exit code 0",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "-inetd (connection on stdin/stdout)",
+    "status": "PASS",
+    "detail": "RFB over inetd stdin/stdout, 640x480",
+    "artifacts": [
+      "/artifacts/wayland-11-inetd-640x480.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "display persists after the session command exits (like Xvnc)",
+    "status": "PASS",
+    "detail": "session exited (status 3), server still running=True, viewer connected afterwards at 640x480",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "-ExitWithSession stops the server with the session (used by vncserver)",
+    "status": "PASS",
+    "detail": "-ExitWithSession: server exited with 0 after the session",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "-depth 16: native RGB565 framebuffer, picture correct",
+    "status": "PASS",
+    "detail": "server pixel format bpp=16 depth=16; foot found at (200, 214, 438, 342); background (49, 52, 65)",
+    "artifacts": [
+      "/artifacts/wayland-12-depth16.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "X-only options (-dpi -ac -fp -noreset -pn) are ignored with a warning instead of refused",
+    "status": "PASS",
+    "detail": "server started=True, warnings for ['-dpi', '-ac', '-fp', '-noreset', '-pn']",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "AvoidShiftNumLock: no fake Shift on keypad keys (xev); keypad keysyms unreachable without NumLock use the plain key",
+    "status": "PASS",
+    "detail": "XK_KP_4 (NumLock off), Num_Lock, XK_KP_Left (NumLock on), Num_Lock: default -> X11 key presses [('13', '4'), ('77', 'Num_Lock'), ('113', 'Left'), ('77', 'Num_Lock')] (want [('13', '4'), ('77', 'Num_Lock'), ('113', 'Left'), ('77', 'Num_Lock')]: the arrow key instead of a fake Shift); -AvoidShiftNumLock=0 -> [('13', '4'), ('77', 'Num_Lock'), ('113', 'Left'), ('77', 'Num_Lock')] (want [('13', '4'), ('77', 'Num_Lock'), ('113', 'Left'), ('77', 'Num_Lock')]: keymap KEYPAD type ignores Shift (xkeyboard-config >= 2.47): plain arrow key, like Xvnc with this data); keymap KEYPAD type uses Shift: False; LED state after Num_Lock 2",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "built-in WM with two screens: windows open, maximize and go fullscreen on one screen (Wayland and X11)",
+    "status": "PASS",
+    "detail": "screens 0+0 800x600 and 800+0 800x600: fullscreen foot (pointer right) (800, 0, 1598, 598); maximized foot (pointer left) (0, 26, 798, 598); xterm -fullscreen at +900+100 (800, 0, 1598, 598)",
+    "artifacts": [
+      "/artifacts/wayland-13-two-screens-fullscreen-right.png",
+      "/artifacts/wayland-14-two-screens-maximized-left.png",
+      "/artifacts/wayland-15-two-screens-xterm-fullscreen-right.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "wlr-output-management: wlr-randr --custom-mode resizes the desktop for all viewers; unsupported changes are refused",
+    "status": "PASS",
+    "detail": "wlr-randr --custom-mode 800x600 rc=0 -> viewer 800x600, wlr-randr current (800, 600), Xwayland 'dimensions:    800x600 pixels (211x158 millimeters)'; --scale 2 rejected rc=1 ''",
+    "artifacts": [
+      "/artifacts/wayland-16-wlr-randr-800x600.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "X11 title bars: window title drawn as text (pixel exact, follows renames), resize by edges and corners, drag moves, maximize/restore and close buttons work",
+    "status": "PASS",
+    "detail": "xterm at (100, 100, 184, 108), title bar pixel (51, 84, 135); title text 'Title Test 42' drawn (0 pixels differ); after renaming, title text 'Renamed-xterm' drawn (0 pixels differ); right edge drag by +100,+0 -> (100, 100, 284, 108) (want (100, 100, 284, 108)); bottom-right corner drag by +50,+40 -> (100, 100, 334, 148) (want (100, 100, 334, 148)); left edge drag by -60,+0 -> (40, 100, 394, 148) (want (40, 100, 394, 148)); top edge (above the bar) drag by +0,-30 -> (40, 70, 394, 178) (want (40, 70, 394, 178)); top-left corner drag by +20,+20 -> (60, 90, 374, 158) (want (60, 90, 374, 158)); title text still correct after resizing (0 pixels differ); after dragging the bar (on the title text) by +200,+150: (260, 240, 374, 158); maximize button -> (0, 22, 800, 578) (want 0,22 ~800x578); maximize again -> (260, 240, 374, 158) (want (260, 240, 374, 158)); close button -> xterm exited=True",
+    "artifacts": [
+      "/artifacts/wayland-17-x11-title-bar.png",
+      "/artifacts/wayland-20-x11-title-renamed.png",
+      "/artifacts/wayland-21-x11-title-bar-resized.png",
+      "/artifacts/wayland-18-x11-title-bar-moved.png",
+      "/artifacts/wayland-19-x11-title-bar-maximized.png"
+    ]
+  },
+  {
+    "suite": "wayland",
+    "test": "vncconfig works in Wayland mode (control socket): -list -get -desc -set/AllowOverride, desktop rename, -disconnect, -connect",
+    "status": "PASS",
+    "detail": "control socket /tmp/wltest/xdg-runtime/tigervnc-wayland-12.vncconfig mode 0o700; -list rc=0, 56 names; -get SendCutText -> 'on'; -get Password refused (rc=1 'vncconfig: No such parameter\\nvncconfig: Getting the value of parameter Password failed'); -desc SendCutText -> 'Send clipboard changes to clients.'; -set SendCutText=0 rc=0, now 'off'; with SendCutText=0 the viewer got None; SendCutText=1 rc=0, then the viewer got 'sent-2'; -set desktop=after-rename rc=0, new viewer sees 'after-rename'; -set rfbport=1 refused (rc=1 'vncconfig: Parameter not in AllowOverride\\nvncconfig: Setting the parameter rfbport=1 failed'); -disconnect rc=0, viewer disconnected=True; -connect 127.0.0.1:45343 rc=0, listening viewer got b'RFB 003.008\\n'; vncconfig -nowin keeps running in the background (running after 2 s: True)",
+    "artifacts": []
+  },
+  {
+    "suite": "wayland",
+    "test": "QueryConnect with the vncconfig prompt (as on Xvnc): rejected without vncconfig, Accept/Reject/busy/timeout with it, -nowin; vncconfig window shows and sets the clipboard parameters",
+    "status": "PASS",
+    "detail": "no prompt running: viewer -> 'error:authentication failed: Unable to query the local user to accept the connection.'; observer: reverse connection (no query, as on Xvnc); vncconfig window on screen at (0, 22, 300, 100); checkboxes show the server's settings (dark pixels in boxes {'AcceptCutText': 0, 'SetPrimary': 17, 'SendCutText': 14, 'SendPrimary': 12}); clicking 'Send clipboard' -> SendCutText=off, 'Accept clipboard' -> AcceptCutText=on; clicking it again -> SendCutText=on; Accept prompt visible to the observer (23387 of 25004 pixels); prompt shown at (262, 238, 266, 94), Accept clicked -> viewer 'connected:qc-test'; Reject prompt visible to the observer (23387 of 25004 pixels); Reject clicked -> viewer 'error:authentication failed: Connection rejected by local user'; second viewer while a query is open -> 'error:authentication failed: Another connection is currently being queried.'; no answer within QueryConnectTimeout=4 -> viewer 'error:authentication failed: The attempt to prompt the user to accept the connection failed'; after vncconfig exits: viewer -> 'error:authentication failed: Unable to query the local user to accept the connection.'; Accept prompt visible to the observer (23387 of 25004 pixels); vncconfig -nowin: no window (''), prompt shown, Accept -> 'connected:qc-test'",
+    "artifacts": [
+      "/artifacts/wayland-22-vncconfig-window.png",
+      "/artifacts/wayland-23-vncconfig-toggled.png",
+      "/artifacts/wayland-24-queryconnect-dialog.png",
+      "/artifacts/wayland-25-queryconnect-nowin.png"
+    ]
+  }
+]

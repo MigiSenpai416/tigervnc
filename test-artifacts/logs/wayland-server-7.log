@@ -1,0 +1,48 @@
+
+Tue Nov 10 16:48:39 2026
+ Main:        Xwayland authority file:
+              /tmp/wltest/xdg-runtime/tigervnc-wayland-7.Xauthority
+ Main:        Wayland display wayland-7 created in /tmp/wltest/xdg-runtime
+              (640x480)
+ Main:        Listening for VNC connections on local interfaces, port 5907
+ Main:        vncconfig control socket:
+              /tmp/wltest/xdg-runtime/tigervnc-wayland-7.vncconfig
+Xwayland glamor: GBM Wayland interfaces not available
+Failed to initialize glamor, falling back to sw
+ WaylandDesktop: Xwayland ready on DISPLAY=:0
+ Main:        Started session 'sh' (pid 144)
+The XKEYBOARD keymap compiler (xkbcomp) reports:
+> Warning:          Unsupported maximum keycode 708, clipping.
+>                   X11 cannot support keycodes above 255.
+> Warning:          Virtual modifier Hyper multiply defined
+>                   Using 0, ignoring 0
+> Warning:          Virtual modifier ScrollLock multiply defined
+>                   Using 0, ignoring 0
+Errors from xkbcomp are not fatal to the X server
+ Connections: Accepted: 127.0.0.1::53750
+ VNCSConnST:  Closing 127.0.0.1::53750: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::53750
+ Connections: Accepted: 127.0.0.1::53758
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth(2)
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
+
+Tue Nov 10 16:48:45 2026
+ VNCSConnST:  Closing 127.0.0.1::53758: Clean disconnection
+ EncodeManager: Framebuffer updates: 1
+ EncodeManager:   Raw:
+ EncodeManager:     Solid: 8 rects, 291.833 kpixels
+ EncodeManager:            1.11335 MiB (1:1 ratio)
+ EncodeManager:     Bitmap RLE: 3 rects, 9.832 kpixels
+ EncodeManager:                 38.4414 KiB (1:1 ratio)
+ EncodeManager:     Indexed RLE: 3 rects, 5.535 kpixels
+ EncodeManager:                  21.6562 KiB (1:1 ratio)
+ EncodeManager:   Total: 14 rects, 307.2 kpixels
+ EncodeManager:          1.17204 MiB (1:1 ratio)
+ Connections: Closed: 127.0.0.1::53758
+ Main:        Terminating
+ Main:        Terminated

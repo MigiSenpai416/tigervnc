@@ -1,0 +1,12 @@
+Ubuntu 26.04.1 LTS, ldd (Ubuntu GLIBC 2.43-2ubuntu2.4) 2.43
+-rwxr-xr-x 1 root root 8236920 Nov 10 16:02 /usr/bin/Xvnc
+-rwxr-xr-x 1 root root 5987128 Nov 10 16:02 /usr/libexec/Xvnc-wayland
+-rwxr-xr-x 1 root root 3952848 Nov 10 16:02 /usr/libexec/tigervnc/Xwayland
+distro Xwayland: /usr/bin/Xwayland
+TigerVNC runtime check: /usr/bin/Xvnc on Ubuntu 26.04.1 LTS
+  ok       shared libraries (Xvnc vncpasswd vncconfig x0vncserver vncsession Xvnc-wayland Xwayland, swrast_dri.so, xkbcomp)
+  ok       GLX driver  /usr/lib/x86_64-linux-gnu/dri/swrast_dri.so
+  ok       xkbcomp     /usr/libexec/tigervnc/xkbcomp (bundled)
+  ok       xkb data    /usr/share/tigervnc/xkb (bundled)
+  ok       keymap      compiled the default keymap (pc105, us)
+OK: all TigerVNC runtime dependencies are present.

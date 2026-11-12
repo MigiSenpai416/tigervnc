@@ -1,0 +1,62 @@
+Tarball: tigervnc-1.16.2.x86_64.tar.gz  sha256 2950091e4fe00414c980348211e86a2ba94676ac24e992148e4ee25df7efa5df
+readelf: GNU readelf (GNU Binutils for Debian) 2.44
+Allowed system libraries: glibc (libc, libm, libdl, libpthread, librt, ld-linux),
+  libGL.so.1 + libgbm.so.1 (Mesa/GLVND), libpam.so.0, libsystemd.so.0
+
+== /usr/bin/Xvnc
+   interpreter: /lib64/ld-linux-x86-64.so.2   max symbol version: GLIBC_2.27   RPATH/RUNPATH: none
+   NEEDED libpam.so.0
+   NEEDED libpthread.so.0
+   NEEDED libGL.so.1
+   NEEDED libgbm.so.1
+   NEEDED libdl.so.2
+   NEEDED libm.so.6
+   NEEDED libc.so.6
+   NEEDED ld-linux-x86-64.so.2
+== /usr/bin/vncconfig
+   interpreter: /lib64/ld-linux-x86-64.so.2   max symbol version: GLIBC_2.26   RPATH/RUNPATH: none
+   NEEDED libpthread.so.0
+   NEEDED libc.so.6
+   NEEDED ld-linux-x86-64.so.2
+== /usr/bin/vncpasswd
+   interpreter: /lib64/ld-linux-x86-64.so.2   max symbol version: GLIBC_2.14   RPATH/RUNPATH: none
+   NEEDED libpthread.so.0
+   NEEDED libc.so.6
+   NEEDED ld-linux-x86-64.so.2
+== /usr/bin/x0vncserver
+   interpreter: /lib64/ld-linux-x86-64.so.2   max symbol version: GLIBC_2.26   RPATH/RUNPATH: none
+   NEEDED libpthread.so.0
+   NEEDED libsystemd.so.0
+   NEEDED libpam.so.0
+   NEEDED librt.so.1
+   NEEDED libm.so.6
+   NEEDED libc.so.6
+   NEEDED ld-linux-x86-64.so.2
+== /usr/libexec/Xvnc-wayland
+   interpreter: /lib64/ld-linux-x86-64.so.2   max symbol version: GLIBC_2.27   RPATH/RUNPATH: none
+   NEEDED libpthread.so.0
+   NEEDED libpam.so.0
+   NEEDED librt.so.1
+   NEEDED libm.so.6
+   NEEDED libc.so.6
+   NEEDED ld-linux-x86-64.so.2
+== /usr/libexec/tigervnc/Xwayland
+   interpreter: /lib64/ld-linux-x86-64.so.2   max symbol version: GLIBC_2.27   RPATH/RUNPATH: none
+   NEEDED libm.so.6
+   NEEDED libpthread.so.0
+   NEEDED librt.so.1
+   NEEDED libdl.so.2
+   NEEDED libGL.so.1
+   NEEDED libc.so.6
+   NEEDED ld-linux-x86-64.so.2
+== /usr/libexec/tigervnc/xkbcomp
+   interpreter: /lib64/ld-linux-x86-64.so.2   max symbol version: GLIBC_2.26   RPATH/RUNPATH: none
+   NEEDED libpthread.so.0
+   NEEDED libc.so.6
+== /usr/sbin/vncsession
+   interpreter: /lib64/ld-linux-x86-64.so.2   max symbol version: GLIBC_2.14   RPATH/RUNPATH: none
+   NEEDED libpthread.so.0
+   NEEDED libpam.so.0
+   NEEDED libc.so.6
+
+RESULT: OK, 8 ELF files, every NEEDED library is in the allowed system set, no RPATH/RUNPATH

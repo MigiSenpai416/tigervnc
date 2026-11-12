@@ -1,0 +1,64 @@
+# Clean runtime test image for a portable TigerVNC tarball:
+# a stock distro image, the test tools from the distro,
+# and the tarball extracted to / (nothing else of TigerVNC, no Xwayland,
+# wlroots, wayland or xkbcommon package for our binaries to pick up).
+# Build with a context directory that contains the tarball as
+# tigervnc.tar.gz and the wlroots patches as wlroots-patches/:
+#   docker build -f contrib/wayland-mode/Dockerfile.tarball-test \
+#     --build-arg BASE_IMAGE=ubuntu:26.04 -t tigervnc-tarball-test:26.04 CONTEXT
+# test-tarball.sh does all of this.
+ARG BASE_IMAGE=ubuntu:26.04
+
+# Nested-compositor fix for the *distro's* sway/labwc (not used by our
+# binaries; Xvnc-wayland links its own wlroots 0.19.3): Ubuntu 26.04's
+# libwlroots 0.19.2-1 lacks upstream 16cb509a, see Dockerfile.test.
+# Only used when NESTED_WLROOTS_FIX=1 (distros whose sway uses wlroots 0.19.2).
+FROM ubuntu:26.04 AS wlroots-fix
+ARG http_proxy
+ARG https_proxy
+ARG NESTED_WLROOTS_FIX=0
+ARG WLROOTS_VERSION=0.19.2-1
+COPY wlroots-patches/ /patches/
+RUN mkdir -p /out && if [ "$NESTED_WLROOTS_FIX" = 1 ]; then \
+      if [ -n "$http_proxy" ]; then printf 'Acquire::http::Proxy "%s";\n' "$http_proxy" > /etc/apt/apt.conf.d/80proxy; fi && \
+      sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/*.sources && \
+      apt-get update && DEBIAN_FRONTEND=noninteractive apt-get build-dep -y "wlroots=${WLROOTS_VERSION}" && \
+      DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends meson ninja-build dpkg-dev && \
+      cd /usr/src && apt-get source "wlroots=${WLROOTS_VERSION}" && cd wlroots-0.19.2 && \
+      for p in /patches/wlroots-*.patch; do patch -p1 < "$p"; done && \
+      meson setup build -Dexamples=false -Dwerror=false --buildtype=debugoptimized && \
+      ninja -C build libwlroots-0.19.so && cp build/libwlroots-0.19.so /out/; \
+    fi
+
+FROM ${BASE_IMAGE}
+ARG http_proxy
+ARG https_proxy
+# test tools (space separated, distro package names); set by test-tarball.sh
+ARG TEST_PACKAGES
+# PY_WHEELS: "URL#sha256 ..." wheels unpacked into a venv of TEST_PYTHON,
+# for distros whose python3 is too old for the tests (ubuntu 18.04: 3.6;
+# its python3.8 has no ensurepip/distutils, so pip cannot bootstrap)
+ARG PY_WHEELS=
+ARG TEST_PYTHON=python3
+ENV DEBIAN_FRONTEND=noninteractive
+RUN if [ -n "$http_proxy" ]; then \
+      printf 'Acquire::http::Proxy "%s";\nAcquire::https::Proxy "%s";\n' "$http_proxy" "${https_proxy:-$http_proxy}" > /etc/apt/apt.conf.d/80proxy; \
+    fi && \
+    apt-get -o Acquire::Retries=5 update && apt-get -o Acquire::Retries=5 install -y --no-install-recommends $TEST_PACKAGES && \
+    if [ -n "$PY_WHEELS" ]; then \
+      $TEST_PYTHON -m venv --without-pip /opt/testpy && \
+      /opt/testpy/bin/python3 -c 'exec("import hashlib, io, sys, sysconfig, urllib.request, zipfile\nfor w in sys.argv[1:]:\n    url, sha = w.split(\x27#\x27)\n    data = urllib.request.urlopen(url, timeout=120).read()\n    assert hashlib.sha256(data).hexdigest() == sha, url\n    zipfile.ZipFile(io.BytesIO(data)).extractall(sysconfig.get_paths()[\x27purelib\x27])")' $PY_WHEELS && \
+      printf '#!/bin/sh\nexec /opt/testpy/bin/python3 "$@"\n' > /usr/local/bin/python3 && \
+      chmod 755 /usr/local/bin/python3 && /usr/local/bin/python3 -c "import PIL"; \
+    fi && \
+    rm -rf /var/lib/apt/lists/* /etc/apt/apt.conf.d/80proxy
+COPY --from=wlroots-fix /out/ /tmp/wlroots-fix/
+RUN if [ -f /tmp/wlroots-fix/libwlroots-0.19.so ]; then \
+      cp /tmp/wlroots-fix/libwlroots-0.19.so /usr/lib/$(uname -m)-linux-gnu/libwlroots-0.19.so; fi && \
+    rm -rf /tmp/wlroots-fix
+COPY tigervnc.tar.gz /tmp/
+RUN tar -xzf /tmp/tigervnc.tar.gz --keep-directory-symlink --strip-components=1 -C / && \
+    rm /tmp/tigervnc.tar.gz && ldconfig && \
+    useradd -m -s /bin/bash vncuser && \
+    echo 'vncuser:vncpass123' | chpasswd && \
+    echo ':1=vncuser' >> /etc/tigervnc/vncserver.users

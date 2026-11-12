@@ -26,6 +26,10 @@
 #
 # vncserver - wrapper script to start an X VNC server.
 #
+# With "mode=wayland" in the configuration it starts Xvnc in Wayland
+# mode ("Xvnc --wayland") with a Wayland session instead. X11 remains
+# the default and behaves as before.
+#
 
 # First make sure we're operating in a sane environment.
 &SanityCheck();
@@ -132,6 +136,29 @@ LoadConfig($vncUserConfig);
 LoadConfig($vncSystemConfigMandatoryFile, 1);
 
 #
+# X11 (default) or Wayland mode. This is a vncserver setting, not an
+# Xvnc parameter, so it is not passed on.
+#
+
+# "mode=x11" is the same as no mode at all
+$sessionMode = lc(delete $config{'mode'} // 'x11');
+$sessionMode =~ s/^\s+|\s+$//g;
+if ($sessionMode ne 'x11' && $sessionMode ne 'wayland') {
+  die "Invalid mode '$sessionMode', must be 'x11' or 'wayland'\n";
+}
+
+if ($sessionMode eq 'wayland') {
+  # Options that only make sense for an X server
+  foreach my $k ('auth', 'fp', 'pn') {
+    delete $default_opts{$k};
+  }
+  # X-only options from the config files (dpi, ac, ...) are passed on;
+  # Xvnc --wayland ignores them with a warning
+} else {
+  &X11SanityCheck();
+}
+
+#
 # Check whether VNC authentication is enabled, and if so, check that
 # a VNC password has been created.
 #
@@ -174,8 +201,11 @@ my %session;
 
 $sessionname = delete $config{'session'};
 
+$sessionDir = ($sessionMode eq 'wayland') ? "/usr/share/wayland-sessions"
+                                          : "/usr/share/xsessions";
+
 if ($sessionname) {
-  %session = LoadXSession($sessionname);
+  %session = LoadXSession($sessionname, $sessionDir);
   if (!%session) {
     warn "Could not load configured desktop session $sessionname\n";
     $sessionname = undef;
@@ -183,9 +213,9 @@ if ($sessionname) {
 }
 
 if (!$sessionname) {
-  foreach $file (glob("/usr/share/xsessions/*.desktop")) {
+  foreach $file (glob("$sessionDir/*.desktop")) {
     ($name) = $file =~ /^.*\/(.*)[.]desktop$/;
-    %session = LoadXSession($name);
+    %session = LoadXSession($name, $sessionDir);
     if (%session) {
       $sessionname = $name;
       last;
@@ -209,6 +239,10 @@ $ENV{XDG_SESSION_DESKTOP} = $sessionname;
 
 if ($session{'DesktopNames'}) {
     $ENV{XDG_CURRENT_DESKTOP} = $session{'DesktopNames'} =~ s/;/:/gr;
+}
+
+if ($sessionMode eq 'wayland') {
+  &StartWaylandSession();
 }
 
 # Make an X server cookie and set up the Xauthority file
@@ -313,10 +347,11 @@ sub LoadConfig {
 # Load a session desktop file
 #
 sub LoadXSession {
-  local ($name) = @_;
+  local ($name, $dir) = @_;
   my $file, $found_group, %session;
 
-  $file = "/usr/share/xsessions/$name.desktop";
+  $dir = "/usr/share/xsessions" if (!$dir);
+  $file = "$dir/$name.desktop";
 
   if (!stat($file)) {
     warn "Could not find session desktop file $file";
@@ -416,6 +451,64 @@ sub CheckDisplayNumber
 }
 
 #
+# Wayland mode: Xvnc --wayland runs the session command itself (after
+# "--") once the compositor and Xwayland are up. With -ExitWithSession
+# it exits when the session command exits, like xinit does in X11 mode
+# (on its own, Xvnc --wayland keeps the display running like Xvnc).
+#
+
+sub StartWaylandSession
+{
+    my @cmd;
+    my $exec = $session{'Exec'};
+
+    # Desktop entry field codes have no meaning here
+    $exec =~ s/%[fFuUdDnNickvm]//g;
+    $exec =~ s/%%/%/g;
+
+    push(@cmd, "@CMAKE_INSTALL_FULL_BINDIR@/Xvnc", "--wayland",
+         ":$displayNumber");
+    # Like xinit in X11 mode: the server stops when the session ends
+    push(@cmd, "-ExitWithSession");
+
+    foreach my $k (sort keys %config) {
+        push(@cmd, "-$k");
+        push(@cmd, $config{$k}) if defined($config{$k});
+        delete $default_opts{$k}; # file options take precedence
+    }
+
+    foreach my $k (sort keys %default_opts) {
+        push(@cmd, "-$k");
+        push(@cmd, $default_opts{$k}) if defined($default_opts{$k});
+    }
+
+    push(@cmd, "--");
+    # Give the session its own D-Bus session bus unless one exists,
+    # the same thing Xsession does for X11 sessions
+    if (!$ENV{DBUS_SESSION_BUS_ADDRESS} && &InPath("dbus-run-session")) {
+        push(@cmd, "dbus-run-session", "--");
+    }
+    push(@cmd, "/bin/sh", "-c", "exec $exec");
+
+    warn "\nNew '$desktopName' Wayland desktop is $host:$displayNumber\n\n";
+
+    warn "Starting Wayland desktop session $sessionname\n";
+
+    exec(@cmd);
+
+    die "Failed to start session.\n";
+}
+
+sub InPath
+{
+    my ($cmd) = @_;
+    for (split(/:/, $ENV{PATH})) {
+        return 1 if (-x "$_/$cmd");
+    }
+    return 0;
+}
+
+#
 # Usage
 #
 
@@ -438,7 +531,27 @@ sub SanityCheck
     #
 
  cmd:
-    foreach $cmd ("uname","xauth","xinit") {
+    foreach $cmd ("uname") {
+	for (split(/:/,$ENV{PATH})) {
+	    if (-x "$_/$cmd") {
+		next cmd;
+	    }
+	}
+	die "$prog: couldn't find \"$cmd\" on your PATH.\n";
+    }
+
+    if (!defined($ENV{HOME})) {
+	die "$prog: The HOME environment variable is not set.\n";
+    }
+}
+
+# Checks only needed for X11 mode (the default)
+sub X11SanityCheck
+{
+    local ($cmd);
+
+ cmd:
+    foreach $cmd ("xauth","xinit") {
 	for (split(/:/,$ENV{PATH})) {
 	    if (-x "$_/$cmd") {
 		next cmd;
@@ -455,9 +568,5 @@ sub SanityCheck
     }
     if (not defined $Xsession) {
         die "$prog: Couldn't find suitable Xsession.\n";
-    }
-
-    if (!defined($ENV{HOME})) {
-	die "$prog: The HOME environment variable is not set.\n";
     }
 }

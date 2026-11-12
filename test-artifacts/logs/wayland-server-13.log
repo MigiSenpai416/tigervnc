@@ -1,0 +1,150 @@
+
+Tue Nov 10 16:49:34 2026
+ Main:        Xwayland authority file:
+              /tmp/wltest/xdg-runtime/tigervnc-wayland-13.Xauthority
+ Main:        Wayland display wayland-13 created in /tmp/wltest/xdg-runtime
+              (800x600)
+ Main:        Listening for VNC connections on local interfaces, port 5913
+ Main:        vncconfig control socket:
+              /tmp/wltest/xdg-runtime/tigervnc-wayland-13.vncconfig
+Xwayland glamor: GBM Wayland interfaces not available
+Failed to initialize glamor, falling back to sw
+ WaylandDesktop: Xwayland ready on DISPLAY=:0
+ Main:        Started session 'sh' (pid 303)
+The XKEYBOARD keymap compiler (xkbcomp) reports:
+> Warning:          Unsupported maximum keycode 708, clipping.
+>                   X11 cannot support keycodes above 255.
+> Warning:          Virtual modifier Hyper multiply defined
+>                   Using 0, ignoring 0
+> Warning:          Virtual modifier ScrollLock multiply defined
+>                   Using 0, ignoring 0
+Errors from xkbcomp are not fatal to the X server
+ Connections: Accepted: 127.0.0.1::52938
+ Connections: Accepted: 127.0.0.1::52948
+ VNCSConnST:  Closing 127.0.0.1::52938: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::52938
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth(2)
+ VNCSConnST:  Closing 127.0.0.1::52948: Unable to query the local user to
+              accept the connection.
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::52948
+ ControlSocket: Reverse connection: 127.0.0.1:58579
+ Connections: Accepted: 127.0.0.1::58579
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth(2)
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
+
+Tue Nov 10 16:49:36 2026
+ ControlSocket: vncconfig QueryConnect prompt connected
+
+Tue Nov 10 16:49:39 2026
+ ControlSocket: Parameter SendCutText changed by vncconfig
+
+Tue Nov 10 16:49:40 2026
+ ControlSocket: Parameter AcceptCutText changed by vncconfig
+
+Tue Nov 10 16:49:43 2026
+ ControlSocket: Parameter SendCutText changed by vncconfig
+
+Tue Nov 10 16:49:44 2026
+ Connections: Accepted: 127.0.0.1::60332
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth(2)
+
+Tue Nov 10 16:49:46 2026
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Closing 127.0.0.1::60332: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::60332
+ Connections: Accepted: 127.0.0.1::60892
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth(2)
+
+Tue Nov 10 16:49:48 2026
+ VNCSConnST:  Closing 127.0.0.1::60892: Connection rejected by local user
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::60892
+ Connections: Accepted: 127.0.0.1::60898
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth(2)
+ Connections: Accepted: 127.0.0.1::60910
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth(2)
+ VNCSConnST:  Closing 127.0.0.1::60910: Another connection is currently being
+              queried.
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::60910
+
+Tue Nov 10 16:49:52 2026
+ VNCSConnST:  Closing 127.0.0.1::60898: The attempt to prompt the user to
+              accept the connection failed
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::60898
+ ControlSocket: vncconfig QueryConnect prompt disconnected
+00:00:17.871 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 365, value 6291464
+00:00:17.871 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 367, value 6291464
+00:00:17.871 [ERROR] [xwayland/xwm.c:1920] xcb error: op ChangeProperty (no minor), code Window (no extension), sequence 370, value 6291464
+00:00:17.871 [ERROR] [xwayland/xwm.c:1920] xcb error: op DeleteProperty (no minor), code Window (no extension), sequence 371, value 6291464
+00:00:17.871 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 374, value 6291495
+00:00:17.871 [ERROR] [xwayland/xwm.c:1920] xcb error: op ConfigureWindow (no minor), code Window (no extension), sequence 376, value 6291495
+00:00:17.871 [ERROR] [xwayland/xwm.c:1920] xcb error: op ChangeProperty (no minor), code Window (no extension), sequence 379, value 6291495
+00:00:17.871 [ERROR] [xwayland/xwm.c:1920] xcb error: op DeleteProperty (no minor), code Window (no extension), sequence 380, value 6291495
+00:00:17.871 [ERROR] [xwayland/xwm.c:1920] xcb error: op DeleteProperty (no minor), code Window (no extension), sequence 383, value 6291495
+
+Tue Nov 10 16:49:53 2026
+ Connections: Accepted: 127.0.0.1::60926
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth(2)
+ VNCSConnST:  Closing 127.0.0.1::60926: Unable to query the local user to
+              accept the connection.
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::60926
+ ControlSocket: vncconfig QueryConnect prompt connected
+
+Tue Nov 10 16:49:55 2026
+ Connections: Accepted: 127.0.0.1::39408
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth(2)
+
+Tue Nov 10 16:49:57 2026
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Closing 127.0.0.1::39408: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::39408
+ VNCSConnST:  Closing 127.0.0.1::58579: Clean disconnection
+ EncodeManager: Framebuffer updates: 9
+ EncodeManager:   Raw:
+ EncodeManager:     Solid: 78 rects, 2.77583 Mpixels
+ EncodeManager:            10.5898 MiB (1:1 ratio)
+ EncodeManager:     Bitmap RLE: 20 rects, 34.096 kpixels
+ EncodeManager:                 133.422 KiB (1:1 ratio)
+ EncodeManager:     Indexed RLE: 35 rects, 111.657 kpixels
+ EncodeManager:                  436.57 KiB (1:1 ratio)
+ EncodeManager:     Full Colour: 4 rects, 78 pixels
+ EncodeManager:                  360 B (1:1 ratio)
+ EncodeManager:   Total: 137 rects, 2.92166 Mpixels
+ EncodeManager:          11.1468 MiB (1:1 ratio)
+ Connections: Closed: 127.0.0.1::58579
+ Main:        Terminating
+ Main:        Terminated

@@ -1,0 +1,25 @@
+[
+  {
+    "suite": "systemd",
+    "test": "vncserver@:1.service, mode=wayland: Wayland session, logind session Type=wayland",
+    "status": "SKIP",
+    "detail": "needs foot, not installed on this distro",
+    "artifacts": []
+  },
+  {
+    "suite": "systemd",
+    "test": "vncserver@:2.service, no mode: X11 session, logind Type=x11",
+    "status": "PASS",
+    "detail": "active=active, logind sessions=[{'Name': 'vncuser', 'Service': 'tigervnc', 'Type': 'x11', 'Class': 'user', 'State': 'active'}], xterm (42, 42, 404, 174)",
+    "artifacts": [
+      "/artifacts/systemd-02-x11-unit.png"
+    ]
+  },
+  {
+    "suite": "systemd",
+    "test": "systemctl stop ends both sessions",
+    "status": "PASS",
+    "detail": "after stop: :1 inactive, remaining tigervnc sessions []",
+    "artifacts": []
+  }
+]

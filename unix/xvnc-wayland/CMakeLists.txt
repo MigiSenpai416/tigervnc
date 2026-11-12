@@ -1,0 +1,129 @@
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  message(FATAL_ERROR "cmake must be invoked with the top level directory")
+endif()
+
+# Xvnc-wayland: the Wayland mode of Xvnc. Users run it as
+# "Xvnc --wayland"; the X.Org built Xvnc execs this program, so it is
+# installed in libexecdir rather than on PATH. wlroots is only linked
+# here, never into the X server.
+
+# Some wlroots headers include generated server protocol headers
+find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
+execute_process(COMMAND ${PKG_CONFIG_EXECUTABLE} --variable=pkgdatadir
+                wayland-protocols
+                OUTPUT_VARIABLE WAYLAND_PROTOCOLS_DIR
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(NOT WAYLAND_PROTOCOLS_DIR)
+  message(FATAL_ERROR "wayland-protocols NOT found, needed by Xvnc-wayland")
+endif()
+
+set(WVNC_PROTOCOLS
+  "xdg-shell|${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml"
+  "wlr-layer-shell-unstable-v1|${CMAKE_CURRENT_SOURCE_DIR}/protocol/wlr-layer-shell-unstable-v1.xml")
+set(WVNC_PROTOCOL_HEADERS)
+foreach(proto ${WVNC_PROTOCOLS})
+  string(REPLACE "|" ";" proto "${proto}")
+  list(GET proto 0 name)
+  list(GET proto 1 xml)
+  set(header ${CMAKE_CURRENT_BINARY_DIR}/${name}-protocol.h)
+  add_custom_command(OUTPUT ${header}
+    COMMAND ${WAYLAND_SCANNER} server-header ${xml} ${header}
+    DEPENDS ${xml})
+  list(APPEND WVNC_PROTOCOL_HEADERS ${header})
+endforeach()
+
+# The clipboard bridge to a nested compositor is a data-control client
+set(DATA_CONTROL_XML
+  ${CMAKE_CURRENT_SOURCE_DIR}/protocol/wlr-data-control-unstable-v1.xml)
+set(DATA_CONTROL_HEADER
+  ${CMAKE_CURRENT_BINARY_DIR}/wlr-data-control-unstable-v1-client-protocol.h)
+set(DATA_CONTROL_CODE
+  ${CMAKE_CURRENT_BINARY_DIR}/wlr-data-control-unstable-v1-protocol.c)
+add_custom_command(OUTPUT ${DATA_CONTROL_HEADER}
+  COMMAND ${WAYLAND_SCANNER} client-header ${DATA_CONTROL_XML}
+          ${DATA_CONTROL_HEADER}
+  DEPENDS ${DATA_CONTROL_XML})
+add_custom_command(OUTPUT ${DATA_CONTROL_CODE}
+  COMMAND ${WAYLAND_SCANNER} private-code ${DATA_CONTROL_XML}
+          ${DATA_CONTROL_CODE}
+  DEPENDS ${DATA_CONTROL_XML})
+
+add_executable(Xvnc-wayland
+  ${WVNC_PROTOCOL_HEADERS}
+  ${DATA_CONTROL_HEADER}
+  ${DATA_CONTROL_CODE}
+  compositor.c
+  ControlSocket.cxx
+  nested_bridge.c
+  WaylandServerDesktop.cxx
+  parameters.cxx
+  wm_icons.c
+  wm_text.c
+  xvnc-wayland.cxx
+  ../w0vncserver/qnum_to_xorgevdev.c
+)
+
+# Window switcher extras (see the top level CMakeLists.txt)
+if(ENABLE_WAYLAND_PNG)
+  target_compile_definitions(Xvnc-wayland PRIVATE HAVE_LIBPNG)
+  target_link_libraries(Xvnc-wayland PRIVATE PkgConfig::WVNC_PNG)
+endif()
+if(ENABLE_WAYLAND_SVG)
+  target_sources(Xvnc-wayland PRIVATE icon_svg.cxx)
+  target_compile_definitions(Xvnc-wayland PRIVATE HAVE_LUNASVG)
+  target_link_libraries(Xvnc-wayland PRIVATE PkgConfig::WVNC_LUNASVG)
+  if(WVNC_PLUTOVG_FOUND)
+    target_link_libraries(Xvnc-wayland PRIVATE PkgConfig::WVNC_PLUTOVG)
+  endif()
+endif()
+if(ENABLE_WAYLAND_FREETYPE)
+  target_compile_definitions(Xvnc-wayland PRIVATE HAVE_FREETYPE)
+  target_link_libraries(Xvnc-wayland PRIVATE PkgConfig::WVNC_FREETYPE)
+endif()
+# TrueType font of the window switcher; packages may install one here
+# (e.g. DejaVu Sans), otherwise the usual distro locations are tried
+set(WVNC_FONT_FILE "${CMAKE_INSTALL_FULL_DATADIR}/tigervnc/fonts/DejaVuSans.ttf"
+  CACHE STRING "TrueType font file the Wayland mode window switcher tries first")
+target_compile_definitions(Xvnc-wayland PRIVATE
+  WVNC_FONT_FILE="${WVNC_FONT_FILE}")
+
+# Xwayland to run (default: "Xwayland" on PATH). Builds that bundle a
+# private Xwayland set this to its absolute path; it should match the
+# path wlroots was built with (its xwayland.pc).
+set(XWAYLAND_PATH "" CACHE STRING
+  "Absolute path of the Xwayland binary Xvnc-wayland runs (default: Xwayland on PATH)")
+
+target_include_directories(Xvnc-wayland PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+if(XWAYLAND_PATH)
+  target_compile_definitions(Xvnc-wayland PRIVATE
+    XWAYLAND_PATH="${XWAYLAND_PATH}")
+endif()
+target_compile_definitions(Xvnc-wayland PRIVATE
+  WLR_USE_UNSTABLE
+  WLROOTS_VERSION_STR="${WLROOTS_VERSION}")
+
+if(WLROOTS_FOUND AND WVNC_XCB_FOUND)
+  # wlroots exposes this in its pkg-config "have_xwayland" variable
+  execute_process(COMMAND ${PKG_CONFIG_EXECUTABLE} --variable=have_xwayland
+                  ${WLROOTS_PKG}
+                  OUTPUT_VARIABLE WLROOTS_HAVE_XWAYLAND
+                  OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(WLROOTS_HAVE_XWAYLAND STREQUAL "true")
+    target_compile_definitions(Xvnc-wayland PRIVATE HAVE_XWAYLAND)
+    target_link_libraries(Xvnc-wayland PRIVATE PkgConfig::WVNC_XCB)
+    message(STATUS "Xvnc-wayland: Xwayland support enabled")
+  else()
+    message(WARNING "${WLROOTS_PKG} was built without Xwayland, X11 applications will not run in Wayland mode")
+  endif()
+endif()
+
+target_link_libraries(Xvnc-wayland PRIVATE rfb network rdr core)
+target_link_libraries(Xvnc-wayland PRIVATE
+  PkgConfig::WLROOTS
+  PkgConfig::WAYLANDSERVER
+  PkgConfig::WVNC_WAYLANDCLIENT
+  PkgConfig::WVNC_XKBCOMMON
+  PkgConfig::WVNC_PIXMAN
+  PkgConfig::WVNC_LIBDRM)
+
+install(TARGETS Xvnc-wayland DESTINATION ${CMAKE_INSTALL_FULL_LIBEXECDIR})

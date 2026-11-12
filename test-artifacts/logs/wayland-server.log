@@ -1,0 +1,140 @@
+
+Tue Nov 10 16:47:44 2026
+ Main:        Xwayland authority file:
+              /tmp/wltest/xdg-runtime/tigervnc-wayland-1.Xauthority
+ Main:        Wayland display wayland-1 created in /tmp/wltest/xdg-runtime
+              (1024x768)
+ Main:        Listening for VNC connections on local interfaces, port 5901
+ Main:        vncconfig control socket:
+              /tmp/wltest/xdg-runtime/tigervnc-wayland-1.vncconfig
+Xwayland glamor: GBM Wayland interfaces not available
+Failed to initialize glamor, falling back to sw
+ WaylandDesktop: Xwayland ready on DISPLAY=:0
+ Main:        Started session '/tmp/wltest/session.sh' (pid 14)
+The XKEYBOARD keymap compiler (xkbcomp) reports:
+> Warning:          Unsupported maximum keycode 708, clipping.
+>                   X11 cannot support keycodes above 255.
+> Warning:          Virtual modifier Hyper multiply defined
+>                   Using 0, ignoring 0
+> Warning:          Virtual modifier ScrollLock multiply defined
+>                   Using 0, ignoring 0
+Errors from xkbcomp are not fatal to the X server
+ Connections: Accepted: 127.0.0.1::47872
+ Connections: Accepted: 127.0.0.1::47888
+ VNCSConnST:  Closing 127.0.0.1::47872: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::47872
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth(2)
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Closing 127.0.0.1::47888: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::47888
+ Connections: Accepted: 127.0.0.1::47896
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth(2)
+ SConnection: Authentication error: Authentication failed
+ VNCSConnST:  Closing 127.0.0.1::47896: Authentication failed
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::47896
+ Connections: Accepted: 127.0.0.1::47910
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VeNCrypt(19)
+ SVeNCrypt:   Client requests security type X509Vnc (261)
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Closing 127.0.0.1::47910: readTLS: The TLS connection was
+              non-properly terminated. (-110)
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::47910
+ Connections: Accepted: 127.0.0.1::47914
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VeNCrypt(19)
+ SVeNCrypt:   Client requests security type TLSVnc (258)
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Closing 127.0.0.1::47914: readTLS: The TLS connection was
+              non-properly terminated. (-110)
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::47914
+ Connections: Accepted: 127.0.0.1::47924
+ SConnection: Client needs protocol version 3.8
+ VNCSConnST:  Closing 127.0.0.1::47924: Clean disconnection
+ EncodeManager: Framebuffer updates: 0
+ EncodeManager:   Total: 0 rects, 0 pixels
+ EncodeManager:          0 B (1:-nan ratio)
+ Connections: Closed: 127.0.0.1::47924
+ Connections: Accepted: 127.0.0.1::47926
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VeNCrypt(19)
+ SVeNCrypt:   Client requests security type X509Vnc (261)
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
+00:00:18.180 [ERROR] [xwayland/xwm.c:1410] Failed to get window property
+00:00:19.214 [ERROR] [xwayland/xwm.c:1410] Failed to get window property
+00:00:23.358 [ERROR] [xwayland/xwm.c:1410] Failed to get window property
+00:00:23.864 [ERROR] [xwayland/xwm.c:1410] Failed to get window property
+
+Tue Nov 10 16:48:09 2026
+ Connections: Accepted: 127.0.0.1::42684
+ SConnection: Client needs protocol version 3.8
+ SConnection: Client requests security type VncAuth(2)
+ VNCSConnST:  Server default pixel format depth 24 (32bpp) little-endian rgb888
+ VNCSConnST:  Client pixel format depth 24 (32bpp) little-endian rgb888
+
+Tue Nov 10 16:48:11 2026
+ WaylandDesktop: Framebuffer resized to 1280x720
+ VNCSConnST:  FramebufferUpdateRequest 1024x768 at 0,0 exceeds framebuffer
+              1280x720
+
+Tue Nov 10 16:48:13 2026
+ VNCSConnST:  FramebufferUpdateRequest 1024x768 at 0,0 exceeds framebuffer
+              1280x720
+
+Tue Nov 10 16:48:15 2026
+ VNCSConnST:  Closing 127.0.0.1::42684: Clean disconnection
+ EncodeManager: Framebuffer updates: 1
+ EncodeManager:   Raw:
+ EncodeManager:     Solid: 25 rects, 747.015 kpixels
+ EncodeManager:            2.84992 MiB (1:1 ratio)
+ EncodeManager:     Bitmap RLE: 1 rects, 1.118 kpixels
+ EncodeManager:                 4.37891 KiB (1:1 ratio)
+ EncodeManager:     Indexed RLE: 3 rects, 27.056 kpixels
+ EncodeManager:                  105.723 KiB (1:1 ratio)
+ EncodeManager:     Full Colour: 4 rects, 11.243 kpixels
+ EncodeManager:                  43.9648 KiB (1:1 ratio)
+ EncodeManager:   Total: 33 rects, 786.432 kpixels
+ EncodeManager:          3.00038 MiB (1:1 ratio)
+ Connections: Closed: 127.0.0.1::42684
+ WaylandDesktop: Framebuffer resized to 1000x700
+ VNCSConnST:  FramebufferUpdateRequest 1280x720 at 0,0 exceeds framebuffer
+              1000x700
+
+Tue Nov 10 16:48:26 2026
+ Main:        Terminating
+ VNCSConnST:  Closing 127.0.0.1::47926: readTLS: The TLS connection was
+              non-properly terminated. (-110)
+ EncodeManager: Framebuffer updates: 22
+ EncodeManager:   Raw:
+ EncodeManager:     Solid: 299 rects, 8.60712 Mpixels
+ EncodeManager:            32.837 MiB (1:1 ratio)
+ EncodeManager:     Bitmap RLE: 32 rects, 34.146 kpixels
+ EncodeManager:                 133.758 KiB (1:1 ratio)
+ EncodeManager:     Indexed RLE: 54 rects, 387.799 kpixels
+ EncodeManager:                  1.47995 MiB (1:1 ratio)
+ EncodeManager:     Full Colour: 54 rects, 117.418 kpixels
+ EncodeManager:                  459.297 KiB (1:1 ratio)
+ EncodeManager:   Total: 439 rects, 9.14648 Mpixels
+ EncodeManager:          34.8961 MiB (1:1 ratio)
+ Main:        Terminated

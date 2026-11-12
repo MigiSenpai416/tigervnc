@@ -1,0 +1,78 @@
+From 16cb509a6e21c8d9d74f4dfa98c7df5f176720c5 Mon Sep 17 00:00:00 2001
+From: John Lindgren <john@jlindgren.net>
+Date: Sat, 20 Dec 2025 14:57:24 -0500
+Subject: [PATCH] render/allocator: add missing wlr_buffer_finish() in destroy
+ impls
+
+Fixes use-after-free on exit of labwc running nested:
+
+==50906== Invalid write of size 8
+==50906==    at 0x4A85403: wl_list_remove (wayland-util.c:57)
+==50906==    by 0x40BBAF9: destroy_wl_buffer (output.c:146)
+==50906==    by 0x40B9B4F: backend_destroy (backend.c:488)
+==50906==    by 0x409E96F: wlr_backend_destroy (backend.c:68)
+==50906==    by 0x40B78A6: multi_backend_destroy (backend.c:62)
+==50906==    by 0x409E96F: wlr_backend_destroy (backend.c:68)
+==50906==    by 0x4043DA0: server_finish (server.c:788)
+==50906==    by 0x403AA85: main (main.c:277)
+==50906==  Address 0xb4435e8 is 40 bytes inside a block of size 136 free'd
+==50906==    at 0x4A3E8EF: free (vg_replace_malloc.c:989)
+==50906==    by 0x409C954: buffer_destroy (shm.c:28)
+==50906==    by 0x40E96F4: buffer_consider_destroy (buffer.c:42)
+==50906==    by 0x40E9754: wlr_buffer_drop (buffer.c:52)
+==50906==    by 0x41498DA: slot_reset (swapchain.c:44)
+==50906==    by 0x4149933: wlr_swapchain_destroy (swapchain.c:53)
+==50906==    by 0x40CB1FA: wlr_output_finish (output.c:410)
+==50906==    by 0x40BE00B: output_destroy (output.c:957)
+==50906==    by 0x40CB2FC: wlr_output_destroy (output.c:436)
+==50906==    by 0x40B9AFC: backend_destroy (backend.c:481)
+==50906==    by 0x409E96F: wlr_backend_destroy (backend.c:68)
+==50906==    by 0x40B78A6: multi_backend_destroy (backend.c:62)
+==50906==  Block was alloc'd at
+==50906==    at 0x4A42C13: calloc (vg_replace_malloc.c:1675)
+==50906==    by 0x409CA84: allocator_create_buffer (shm.c:68)
+==50906==    by 0x409C7BA: wlr_allocator_create_buffer (allocator.c:186)
+==50906==    by 0x4149B80: wlr_swapchain_acquire (swapchain.c:102)
+==50906==    by 0x40C90DA: render_cursor_buffer (cursor.c:246)
+==50906==    by 0x40C93DC: output_cursor_attempt_hardware (cursor.c:303)
+==50906==    by 0x40C9A61: output_cursor_set_texture (cursor.c:420)
+==50906==    by 0x40C9738: wlr_output_cursor_set_buffer (cursor.c:352)
+==50906==    by 0x40F13A0: output_cursor_set_xcursor_image (wlr_cursor.c:507)
+==50906==    by 0x40F1B28: cursor_output_cursor_update (wlr_cursor.c:630)
+==50906==    by 0x40F1C2A: cursor_update_outputs (wlr_cursor.c:657)
+==50906==    by 0x40F1CF9: wlr_cursor_set_xcursor (wlr_cursor.c:674)
+
+Fixes: 7963ba6a0deb5b696050d914ac395bca9c4c06b2
+("buffer: introduce wlr_buffer_finish()")
+---
+ render/allocator/shm.c     | 1 +
+ render/allocator/udmabuf.c | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/render/allocator/shm.c b/render/allocator/shm.c
+index 2622f99aa..b5be7d014 100644
+--- a/render/allocator/shm.c
++++ b/render/allocator/shm.c
+@@ -23,6 +23,7 @@ static struct wlr_shm_buffer *shm_buffer_from_buffer(
+ 
+ static void buffer_destroy(struct wlr_buffer *wlr_buffer) {
+ 	struct wlr_shm_buffer *buffer = shm_buffer_from_buffer(wlr_buffer);
++	wlr_buffer_finish(wlr_buffer);
+ 	munmap(buffer->data, buffer->size);
+ 	close(buffer->shm.fd);
+ 	free(buffer);
+diff --git a/render/allocator/udmabuf.c b/render/allocator/udmabuf.c
+index e0b01b70a..8a7109aa5 100644
+--- a/render/allocator/udmabuf.c
++++ b/render/allocator/udmabuf.c
+@@ -31,6 +31,7 @@ static bool buffer_get_dmabuf(struct wlr_buffer *wlr_buffer, struct wlr_dmabuf_a
+ 
+ static void buffer_destroy(struct wlr_buffer *wlr_buffer) {
+ 	struct wlr_udmabuf_buffer *buffer = wl_container_of(wlr_buffer, buffer, base);
++	wlr_buffer_finish(wlr_buffer);
+ 	wlr_dmabuf_attributes_finish(&buffer->dmabuf);
+ 	close(buffer->shm.fd);
+ 	free(buffer);
+-- 
+GitLab
+
